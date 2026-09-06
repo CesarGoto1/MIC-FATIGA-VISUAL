@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+gunicorn
+psycopg2-binary
+bcrypt
+pyjwt
+python-multipart
+python-dotenv
+jinja2
+email-validator
+httpx

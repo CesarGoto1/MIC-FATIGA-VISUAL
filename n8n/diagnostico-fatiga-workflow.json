@@ -1,0 +1,126 @@
+{
+  "name": "Diagnóstico de fatiga visual (Gemini)",
+  "nodes": [
+    {
+      "id": "n8n-node-webhook-fatiga-1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "visual-fatigue-diagnosis-webhook",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "visual-fatigue-diagnosis",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "n8n-node-set-prompt-2",
+      "name": "Construir prompt",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [260, 0],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-prompt",
+              "name": "prompt",
+              "type": "string",
+              "value": "={{ `Eres un asistente de salud visual. Redacta en español, en 2 a 3 frases, un diagnóstico narrativo breve y empático (sin lenguaje alarmista ni diagnósticos médicos), con una recomendación práctica concreta, para un usuario que estuvo en la actividad ${$json.body.actividad} y presenta fatiga visual nivel ${$json.body.nivel_fatiga} (EAR promedio ${$json.body.ear}, PERCLOS ${$json.body.perclos}%, parpadeos por minuto ${$json.body.parpadeos_min}).` }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n8n-node-ai-agent-3",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [520, 0],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {
+          "systemMessage": "Eres un asistente de salud visual. Responde siempre en español, en 2 a 3 frases, con tono narrativo y empático, sin lenguaje alarmista ni diagnósticos médicos."
+        }
+      }
+    },
+    {
+      "id": "n8n-node-lm-gemini-3b",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [500, 220],
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash-lite",
+        "options": {}
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "ID-API-GEMINI",
+          "name": "API-Key"
+        }
+      }
+    },
+    {
+      "id": "n8n-node-set-texto-4",
+      "name": "Extraer texto",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [780, 0],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-texto",
+              "name": "texto",
+              "type": "string",
+              "value": "={{ ($json.output ?? '').trim() }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n8n-node-respond-5",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1040, 0],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { texto: $json.texto } }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Construir prompt", "type": "main", "index": 0 }]]
+    },
+    "Construir prompt": {
+      "main": [[{ "node": "AI Agent", "type": "main", "index": 0 }]]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [[{ "node": "AI Agent", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "AI Agent": {
+      "main": [[{ "node": "Extraer texto", "type": "main", "index": 0 }]]
+    },
+    "Extraer texto": {
+      "main": [[{ "node": "Responder", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

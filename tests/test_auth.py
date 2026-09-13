@@ -1,12 +1,3 @@
-"""Pruebas básicas de los endpoints de autenticación.
-
-Requieren una base de datos de pruebas disponible (por ejemplo, la misma
-levantada con `docker compose up -d db`) y las variables de entorno de
-.env cargadas. Ejecutar con:
-
-    pytest
-"""
-
 import uuid
 
 import pytest
@@ -74,7 +65,15 @@ def test_full_session_flow():
 
     metrics_response = client.post(
         f"/sessions/{sesion_id}/metrics",
-        json={"actividad": "lectura", "ear": 0.28, "perclos": 5.0, "parpadeos_min": 15.0},
+        json={
+            "actividad": "lectura",
+            "ear": 0.28,
+            "perclos": 5.0,
+            "parpadeos_min": 15.0,
+            "tiempo_cierre": 150.0,
+            "velocidad_ocular": 0.02,
+            "nivel_subjetivo": 2,
+        },
         headers=headers,
     )
     assert metrics_response.status_code == 200

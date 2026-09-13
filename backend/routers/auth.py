@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
-from backend.database import get_connection
+from backend.database import get_db
+from backend.models.orm import Usuario
 from backend.models.schemas import LoginRequest, RegisterRequest, TokenResponse
 from backend.security import create_access_token, hash_password, verify_password
 
@@ -8,55 +10,40 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def register(data: RegisterRequest):
-    password_hash = hash_password(data.password)
+def register(data: RegisterRequest, db: Session = Depends(get_db)):
+    """Crea un usuario nuevo y devuelve su token de acceso."""
+    existe = db.query(Usuario).filter(Usuario.email == data.email).first()
+    if existe is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe una cuenta registrada con ese correo.",
+        )
 
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id FROM usuarios WHERE email = %s", (data.email,))
-            if cur.fetchone() is not None:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Ya existe una cuenta registrada con ese correo.",
-                )
+    usuario = Usuario(
+        nombre=data.nombre,
+        email=data.email,
+        password_hash=hash_password(data.password),
+    )
+    db.add(usuario)
+    db.flush()
 
-            cur.execute(
-                """
-                INSERT INTO usuarios (nombre, email, password_hash)
-                VALUES (%s, %s, %s)
-                RETURNING id, nombre
-                """,
-                (data.nombre, data.email, password_hash),
-            )
-            usuario_id, nombre = cur.fetchone()
-
-    token = create_access_token(usuario_id)
-    return TokenResponse(access_token=token, usuario_id=usuario_id, nombre=nombre)
+    token = create_access_token(usuario.id)
+    return TokenResponse(access_token=token, usuario_id=usuario.id, nombre=usuario.nombre)
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(data: LoginRequest):
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, nombre, password_hash FROM usuarios WHERE email = %s",
-                (data.email,),
-            )
-            row = cur.fetchone()
-
-    # Mensaje idéntico para "no existe" y "contraseña incorrecta": no revelar
-    # cuál de las dos cosas falló (evita enumeración de correos registrados).
+def login(data: LoginRequest, db: Session = Depends(get_db)):
+    """Valida credenciales de un usuario existente y devuelve su token de acceso."""
     credenciales_invalidas = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Correo o contraseña incorrectos.",
     )
 
-    if row is None:
+    usuario = db.query(Usuario).filter(Usuario.email == data.email).first()
+    if usuario is None:
+        raise credenciales_invalidas
+    if not verify_password(data.password, usuario.password_hash):
         raise credenciales_invalidas
 
-    usuario_id, nombre, password_hash = row
-    if not verify_password(data.password, password_hash):
-        raise credenciales_invalidas
-
-    token = create_access_token(usuario_id)
-    return TokenResponse(access_token=token, usuario_id=usuario_id, nombre=nombre)
+    token = create_access_token(usuario.id)
+    return TokenResponse(access_token=token, usuario_id=usuario.id, nombre=usuario.nombre)

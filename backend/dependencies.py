@@ -10,14 +10,6 @@ _bearer_scheme = HTTPBearer(auto_error=False)
 def get_current_user_id(
     credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
 ) -> int:
-    """Dependencia que todo endpoint protegido debe usar en lugar de
-    aceptar un 'usuario_id' enviado en el body por el cliente.
-
-    Uso en un router:
-        @router.post("/sessions")
-        def create_session(usuario_id: int = Depends(get_current_user_id)):
-            ...
-    """
     if credentials is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

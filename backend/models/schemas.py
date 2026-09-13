@@ -6,8 +6,6 @@ NivelFatiga = Literal["sin_fatiga", "leve", "moderada"]
 MomentoJornada = Literal["pre", "post"]
 
 
-# --- Auth ---
-
 class RegisterRequest(BaseModel):
     nombre: str = Field(min_length=1, max_length=120)
     email: EmailStr
@@ -26,12 +24,8 @@ class TokenResponse(BaseModel):
     nombre: str
 
 
-# --- Sesiones (RF07) ---
-
 class SessionCreateRequest(BaseModel):
     actividad: str = Field(min_length=1, max_length=80)
-    # Fase experimental pre/post jornada (Objetivo específico 4). Opcional:
-    # None para sesiones sueltas fuera del protocolo de validación.
     momento: Optional[MomentoJornada] = None
 
 
@@ -41,24 +35,21 @@ class SessionCreateResponse(BaseModel):
     momento: Optional[MomentoJornada]
 
 
-# --- Métricas (RF03, RF04, RF05) ---
-# Estos son los valores que el CLIENTE ya calculó localmente a partir de
-# MediaPipe (ver RNF01): nunca se envían imágenes ni video, solo números.
-
 class MetricsInRequest(BaseModel):
     actividad: str = Field(min_length=1, max_length=80)
     ear: float = Field(ge=0, le=1, description="Eye Aspect Ratio promedio del intervalo")
     perclos: float = Field(ge=0, le=100, description="Porcentaje de cierre ocular")
     parpadeos_min: float = Field(ge=0, description="Frecuencia de parpadeo por minuto")
+    tiempo_cierre: float = Field(ge=0, description="Duración promedio de cierre ocular en ms")
+    velocidad_ocular: float = Field(ge=0, description="Índice de velocidad de movimiento ocular")
+    nivel_subjetivo: int = Field(ge=1, le=5, description="Autoevaluación de fatiga visual (1-5)")
 
 
 class MetricsSavedResponse(BaseModel):
     medicion_id: int
     nivel_fatiga: NivelFatiga
-    diagnostico_disponible: bool  # RNF05: false si el diagnóstico de IA no respondió aún
+    diagnostico_disponible: bool
 
-
-# --- Historial (Objetivo específico 4 / RF07) ---
 
 class MedicionOut(BaseModel):
     id: int
@@ -66,6 +57,9 @@ class MedicionOut(BaseModel):
     ear: Optional[float]
     perclos: Optional[float]
     parpadeos_min: Optional[float]
+    tiempo_cierre: Optional[float]
+    velocidad_ocular: Optional[float]
+    nivel_subjetivo: Optional[int]
     nivel_fatiga: Optional[str]
     registrado_en: str
 
@@ -79,9 +73,8 @@ class SesionOut(BaseModel):
     mediciones: list[MedicionOut]
 
 
-# --- Diagnóstico narrativo (RF09) ---
-
 class DiagnosticoOut(BaseModel):
     disponible: bool
     texto: Optional[str]
+    detalle: Optional[dict] = None
     generado_en: Optional[str]

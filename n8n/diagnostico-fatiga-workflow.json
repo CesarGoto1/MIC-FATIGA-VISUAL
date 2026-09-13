@@ -1,12 +1,15 @@
 {
-  "name": "Diagnóstico de fatiga visual (Gemini)",
+  "name": "Diagnostico comparativo de fatiga visual (Gemini)",
   "nodes": [
     {
       "id": "n8n-node-webhook-fatiga-1",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "webhookId": "visual-fatigue-diagnosis-webhook",
       "parameters": {
         "httpMethod": "POST",
@@ -20,7 +23,10 @@
       "name": "Construir prompt",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [260, 0],
+      "position": [
+        260,
+        0
+      ],
       "parameters": {
         "mode": "manual",
         "assignments": {
@@ -29,7 +35,7 @@
               "id": "assign-prompt",
               "name": "prompt",
               "type": "string",
-              "value": "={{ `Eres un asistente de salud visual. Redacta en español, en 2 a 3 frases, un diagnóstico narrativo breve y empático (sin lenguaje alarmista ni diagnósticos médicos), con una recomendación práctica concreta, para un usuario que estuvo en la actividad ${$json.body.actividad} y presenta fatiga visual nivel ${$json.body.nivel_fatiga} (EAR promedio ${$json.body.ear}, PERCLOS ${$json.body.perclos}%, parpadeos por minuto ${$json.body.parpadeos_min}).` }}"
+              "value": "={{ `**ROL Y TAREA PRINCIPAL:**\nEres un oftalmologo experto, altamente especializado en el diagnostico y analisis comparativo del estres y la fatiga visual. Tu unica tarea es analizar la evolucion de los datos de fatiga de un paciente, comparando la medicion Inicial con la medicion Final tomadas en la misma sesion.\n\nTu objetivo es evaluar si hubo una mejora, empeoramiento o mantenimiento del estado de fatiga, e identificar la progresion de cada parametro. Genera el diagnostico exhaustivo y detallado unicamente en el formato JSON de salida estricto, sin texto adicional ni bloques de codigo markdown.\n\n---\n**DATOS DE ENTRADA:**\n{\n  \"medicion_inicial\": {\n    \"usuario_id\": ${$json.body.medicion_inicial.usuario_id},\n    \"perclos\": ${$json.body.medicion_inicial.perclos},\n    \"sebr\": ${$json.body.medicion_inicial.sebr},\n    \"tiempo_cierre\": ${$json.body.medicion_inicial.tiempo_cierre},\n    \"velocidad_ocular\": ${$json.body.medicion_inicial.velocidad_ocular},\n    \"nivel_subjetivo\": ${$json.body.medicion_inicial.nivel_subjetivo}\n  },\n  \"medicion_final\": {\n    \"perclos\": ${$json.body.medicion_final.perclos},\n    \"sebr\": ${$json.body.medicion_final.sebr},\n    \"tiempo_cierre\": ${$json.body.medicion_final.tiempo_cierre},\n    \"velocidad_ocular\": ${$json.body.medicion_final.velocidad_ocular},\n    \"nivel_subjetivo\": ${$json.body.medicion_final.nivel_subjetivo}\n  }\n}\n\n---\n**FORMATO DE SALIDA JSON REQUERIDO (ESTRICTO):**\nGenera unicamente el siguiente objeto JSON. Rellena todos los valores con el analisis solicitado, sin dejar ninguna propiedad como \"string\".\n\n{\n  \"diagnostico_general\": \"string (Resumen de la progresion y conclusion sobre la evolucion de la fatiga: si mejoro, empeoro o se mantuvo en general).\",\n  \"evaluacion_parametros\": {\n    \"perclos\": {\n      \"valor_inicial\": ${$json.body.medicion_inicial.perclos},\n      \"valor_final\": ${$json.body.medicion_final.perclos},\n      \"interpretacion\": \"string (Analisis comparativo del cambio de PERCLOS y su significado clinico).\",\n      \"recomendacion\": \"string (Recomendacion especifica basada en la progresion de PERCLOS).\"\n    },\n    \"sebr\": {\n      \"valor_inicial\": ${$json.body.medicion_inicial.sebr},\n      \"valor_final\": ${$json.body.medicion_final.sebr},\n      \"interpretacion\": \"string (Analisis comparativo del cambio de SEBR y su significado clinico).\",\n      \"recomendacion\": \"string (Recomendacion especifica basada en la progresion de SEBR).\"\n    },\n    \"tiempo_cierre\": {\n      \"valor_inicial\": ${$json.body.medicion_inicial.tiempo_cierre},\n      \"valor_final\": ${$json.body.medicion_final.tiempo_cierre},\n      \"interpretacion\": \"string (Analisis comparativo del cambio en el tiempo de cierre y su significado clinico).\",\n      \"recomendacion\": \"string (Recomendacion especifica basada en la progresion del tiempo de cierre).\"\n    },\n    \"velocidad_ocular\": {\n      \"valor_inicial\": ${$json.body.medicion_inicial.velocidad_ocular},\n      \"valor_final\": ${$json.body.medicion_final.velocidad_ocular},\n      \"interpretacion\": \"string (Analisis comparativo del cambio en la velocidad ocular y su significado clinico).\",\n      \"recomendacion\": \"string (Recomendacion especifica basada en la progresion de la velocidad ocular).\"\n    },\n    \"nivel_subjetivo\": {\n      \"valor_inicial\": ${$json.body.medicion_inicial.nivel_subjetivo},\n      \"valor_final\": ${$json.body.medicion_final.nivel_subjetivo},\n      \"interpretacion\": \"string (Analisis comparativo del cambio en el nivel subjetivo y si correlaciona con los datos objetivos).\",\n      \"recomendacion\": \"string (Recomendacion especifica basada en la progresion del nivel subjetivo).\"\n    }\n  },\n  \"recomendaciones_generales\": [\n    \"string (Recomendacion general 1 para mitigar la fatiga y mejorar la higiene visual).\",\n    \"string (Recomendacion general 2 para mitigar la fatiga y mejorar la higiene visual).\",\n    \"string (Recomendacion general 3 para mitigar la fatiga y mejorar la higiene visual).\"\n  ],\n  \"severidad_fatiga_final\": \"string (Severidad de la fatiga despues de la sesion: Leve, Moderada, Alta o Severa).\"\n}` }}"
             }
           ]
         },
@@ -41,12 +47,15 @@
       "name": "AI Agent",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2,
-      "position": [520, 0],
+      "position": [
+        520,
+        0
+      ],
       "parameters": {
         "promptType": "define",
         "text": "={{ $json.prompt }}",
         "options": {
-          "systemMessage": "Eres un asistente de salud visual. Responde siempre en español, en 2 a 3 frases, con tono narrativo y empático, sin lenguaje alarmista ni diagnósticos médicos."
+          "systemMessage": "Eres un oftalmologo experto en fatiga visual. Responde UNICAMENTE con el objeto JSON solicitado, sin texto adicional, explicaciones ni bloques de codigo markdown."
         }
       }
     },
@@ -55,7 +64,10 @@
       "name": "Google Gemini Chat Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1,
-      "position": [500, 220],
+      "position": [
+        500,
+        220
+      ],
       "parameters": {
         "modelName": "models/gemini-3.5-flash-lite",
         "options": {}
@@ -68,24 +80,16 @@
       }
     },
     {
-      "id": "n8n-node-set-texto-4",
-      "name": "Extraer texto",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [780, 0],
+      "id": "n8n-node-code-parse-4",
+      "name": "Parsear diagnostico",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        0
+      ],
       "parameters": {
-        "mode": "manual",
-        "assignments": {
-          "assignments": [
-            {
-              "id": "assign-texto",
-              "name": "texto",
-              "type": "string",
-              "value": "={{ ($json.output ?? '').trim() }}"
-            }
-          ]
-        },
-        "options": {}
+        "jsCode": "const raw = ($input.first().json.output ?? '').trim();\nconst cleaned = raw.replace(/^```(?:json)?\\s*/i, '').replace(/```\\s*$/, '').trim();\nlet data;\ntry {\n  data = JSON.parse(cleaned);\n} catch (err) {\n  data = {\n    diagnostico_general: raw,\n    evaluacion_parametros: {},\n    recomendaciones_generales: [],\n    severidad_fatiga_final: ''\n  };\n}\nreturn [{ json: data }];"
       }
     },
     {
@@ -93,29 +97,72 @@
       "name": "Responder",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1040, 0],
+      "position": [
+        1040,
+        0
+      ],
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { texto: $json.texto } }}",
+        "responseBody": "={{ $json }}",
         "options": {}
       }
     }
   ],
   "connections": {
     "Webhook": {
-      "main": [[{ "node": "Construir prompt", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Construir prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Construir prompt": {
-      "main": [[{ "node": "AI Agent", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Google Gemini Chat Model": {
-      "ai_languageModel": [[{ "node": "AI Agent", "type": "ai_languageModel", "index": 0 }]]
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
     },
     "AI Agent": {
-      "main": [[{ "node": "Extraer texto", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Parsear diagnostico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "Extraer texto": {
-      "main": [[{ "node": "Responder", "type": "main", "index": 0 }]]
+    "Parsear diagnostico": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,

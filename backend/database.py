@@ -1,29 +1,23 @@
-from contextlib import contextmanager
+from collections.abc import Generator
 
-from psycopg2 import pool
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import DATABASE_URL
 
-# Pool simple de conexiones. min=1, max=10 es suficiente para desarrollo
-# y para un prototipo con un grupo focal reducido de usuarios.
-_pool = pool.SimpleConnectionPool(1, 10, dsn=DATABASE_URL)
+engine = create_engine(DATABASE_URL, pool_size=5, max_overflow=5, pool_pre_ping=True)
+
+SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
-@contextmanager
-def get_connection():
-    """Entrega una conexión del pool y la devuelve al terminar.
-
-    Uso:
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(...)
-    """
-    conn = _pool.getconn()
+def get_db() -> Generator[Session, None, None]:
+    """Entrega una sesión de SQLAlchemy por request y la cierra al terminar."""
+    db = SessionLocal()
     try:
-        yield conn
-        conn.commit()
+        yield db
+        db.commit()
     except Exception:
-        conn.rollback()
+        db.rollback()
         raise
     finally:
-        _pool.putconn(conn)
+        db.close()

@@ -27,8 +27,6 @@ function showTab(tab) {
 tabLogin.addEventListener("click", () => showTab("login"));
 tabRegister.addEventListener("click", () => showTab("register"));
 
-// Botones de mostrar/ocultar contraseña: alternan el type del input
-// asociado (data-toggle-for) y el icono de ojo abierto/tachado.
 document.querySelectorAll(".auth-field__toggle").forEach((button) => {
   const input = document.getElementById(button.dataset.toggleFor);
   const eyeIcon = button.querySelector(".icon-eye");
@@ -47,8 +45,6 @@ function showError(message) {
   authError.hidden = false;
 }
 
-// Deshabilita el botón y muestra un estado de "cargando" mientras la
-// petición está en curso, para que el usuario no pueda hacer doble submit.
 async function submitWithLoadingState(form, label, action) {
   const button = form.querySelector(".auth-submit");
   const buttonLabel = button.querySelector(".auth-submit__label");
@@ -105,9 +101,6 @@ document.getElementById("register-form").addEventListener("submit", async (e) =>
   });
 });
 
-// Si ya hay un token guardado, entra directo al panel principal.
-// (El token se valida de verdad en la primera petición protegida; si
-// expiró, apiFetch() lo detecta con un 401 y recarga a esta pantalla.)
 if (getToken()) {
   showDashboardView();
 }

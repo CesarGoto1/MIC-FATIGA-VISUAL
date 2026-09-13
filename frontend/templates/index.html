@@ -374,6 +374,29 @@
               <p class="stat-card__label">Nivel de fatiga</p>
             </div>
           </div>
+          <div class="stat-card">
+            <span class="stat-card__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 6v6l4 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/>
+              </svg>
+            </span>
+            <div>
+              <p class="stat-card__value"><span id="metric-cierre">--</span> ms</p>
+              <p class="stat-card__label">Tiempo de cierre</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <span class="stat-card__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 12h5l2-7 4 14 2-7h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <div>
+              <p class="stat-card__value"><span id="metric-velocidad">--</span></p>
+              <p class="stat-card__label">Velocidad ocular</p>
+            </div>
+          </div>
         </div>
 
         <div class="mon-momento">
@@ -382,6 +405,17 @@
             <option value="">Sin especificar</option>
             <option value="pre">Antes de la jornada de estudio</option>
             <option value="post">Después de la jornada de estudio</option>
+          </select>
+        </div>
+
+        <div class="mon-momento">
+          <label for="mon-nivel-select">¿Cómo sientes tus ojos ahora?</label>
+          <select id="mon-nivel-select">
+            <option value="1">1 - Muy descansados</option>
+            <option value="2">2 - Descansados</option>
+            <option value="3" selected>3 - Normal</option>
+            <option value="4">4 - Cansados</option>
+            <option value="5">5 - Muy cansados</option>
           </select>
         </div>
 
@@ -398,8 +432,6 @@
     </div>
   </main>
 
-  <!-- MediaPipe FaceMesh: extracción de landmarks faciales en el cliente
-       (RNF01, Privacidad por diseño — el video nunca sale del navegador) -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 

@@ -1,9 +1,3 @@
-/**
- * Panel principal: resumen de sesiones a partir de GET /users/me/history
- * (RF07). Todo lo que se muestra aquí sale de datos reales ya guardados
- * por el backend — nada se inventa en el cliente.
- */
-
 const NIVEL_ORDEN = { sin_fatiga: 0, leve: 1, moderada: 2 };
 const NIVEL_LABEL = { sin_fatiga: "Sin fatiga", leve: "Fatiga leve", moderada: "Fatiga moderada" };
 const NIVEL_CLASE = { sin_fatiga: "badge--ok", leve: "badge--leve", moderada: "badge--moderada" };
@@ -49,6 +43,55 @@ function renderStats(sesiones) {
   document.getElementById("stat-last").textContent = ultima;
 }
 
+const PARAMETRO_LABEL = {
+  perclos: "PERCLOS",
+  sebr: "Frecuencia de parpadeo",
+  tiempo_cierre: "Tiempo de cierre",
+  velocidad_ocular: "Velocidad ocular",
+  nivel_subjetivo: "Nivel subjetivo",
+};
+
+const SEVERIDAD_CLASE = {
+  Leve: "badge--ok",
+  Moderada: "badge--leve",
+  Alta: "badge--moderada",
+  Severa: "badge--moderada",
+};
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text ?? "";
+  return div.innerHTML;
+}
+
+function renderDiagnosticoDetalle(detalle) {
+  const severidad = detalle.severidad_fatiga_final || "";
+  const severidadClase = SEVERIDAD_CLASE[severidad] || "";
+
+  const parametrosHtml = Object.entries(detalle.evaluacion_parametros || {})
+    .map(([clave, valor]) => `
+      <div class="diagnosis-param">
+        <p class="diagnosis-param__titulo">${escapeHtml(PARAMETRO_LABEL[clave] || clave)}
+          <span class="diagnosis-param__valores">${escapeHtml(valor.valor_inicial)} → ${escapeHtml(valor.valor_final)}</span>
+        </p>
+        <p class="diagnosis-param__texto">${escapeHtml(valor.interpretacion)}</p>
+        <p class="diagnosis-param__texto"><strong>Recomendación:</strong> ${escapeHtml(valor.recomendacion)}</p>
+      </div>
+    `)
+    .join("");
+
+  const recomendacionesHtml = (detalle.recomendaciones_generales || [])
+    .map((rec) => `<li>${escapeHtml(rec)}</li>`)
+    .join("");
+
+  return `
+    <p class="diagnosis-summary">${escapeHtml(detalle.diagnostico_general)}</p>
+    ${severidad ? `<span class="badge ${severidadClase}">Severidad: ${escapeHtml(severidad)}</span>` : ""}
+    ${parametrosHtml}
+    ${recomendacionesHtml ? `<ul class="diagnosis-recs">${recomendacionesHtml}</ul>` : ""}
+  `;
+}
+
 async function toggleDiagnostico(sesionId, container) {
   const isOpen = !container.hidden;
   if (isOpen) {
@@ -62,9 +105,13 @@ async function toggleDiagnostico(sesionId, container) {
 
   try {
     const data = await apiFetch(`/sessions/${sesionId}/diagnosis`);
-    container.textContent = data.disponible && data.texto
-      ? data.texto
-      : "El diagnóstico todavía no está disponible para esta sesión.";
+    if (data.disponible && data.detalle) {
+      container.innerHTML = renderDiagnosticoDetalle(data.detalle);
+    } else if (data.disponible && data.texto) {
+      container.textContent = data.texto;
+    } else {
+      container.textContent = "El diagnóstico todavía no está disponible para esta sesión.";
+    }
     container.dataset.loaded = "true";
   } catch (err) {
     container.textContent = `No se pudo cargar el diagnóstico: ${err.message}`;
@@ -95,7 +142,7 @@ function renderSessionRow(sesion) {
     toggle.className = "session-row__toggle";
     toggle.textContent = "Ver diagnóstico";
 
-    const diagBox = document.createElement("p");
+    const diagBox = document.createElement("div");
     diagBox.className = "session-row__diagnosis";
     diagBox.hidden = true;
 

@@ -2,6 +2,8 @@ fastapi
 uvicorn[standard]
 gunicorn
 psycopg2-binary
+sqlalchemy>=2.0,<2.1
+alembic>=1.13,<1.14
 bcrypt
 pyjwt
 python-multipart

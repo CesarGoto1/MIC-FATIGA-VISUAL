@@ -1,34 +1,19 @@
-/**
- * Captura de video (WebRTC) + MediaPipe FaceMesh + cálculo de EAR/PERCLOS
- * /frecuencia de parpadeo, TODO en el cliente (RNF01, Privacidad por
- * diseño). Solo se envían al backend los números ya calculados —
- * nunca video ni imágenes.
- *
- * Referencias de la RSL:
- *  - EAR estándar de 6 puntos por ojo: Abdulkader et al. (2023).
- *  - Línea base adaptativa por usuario (AEAR) en vez de umbral fijo:
- *    Gupta et al. (2023).
- */
-
-// Índices de landmarks de MediaPipe FaceMesh para el contorno de cada ojo
-// (formato estándar de 6 puntos usado para el cálculo de EAR).
 const RIGHT_EYE = [33, 160, 158, 133, 153, 144];
 const LEFT_EYE = [362, 385, 387, 263, 373, 380];
+const RIGHT_IRIS_CENTER = 468;
+const LEFT_IRIS_CENTER = 473;
 
-const CALIBRATION_SECONDS = 5;   // duración de la línea base personalizada (AEAR)
-const CLOSURE_RATIO = 0.75;      // el ojo se considera "cerrado" bajo este % de la línea base
-const PERCLOS_WINDOW_MS = 60_000; // ventana móvil de 1 minuto para PERCLOS y parpadeo/min
-const METRICS_SEND_INTERVAL_MS = 15_000; // cada cuánto se envían métricas al backend
-// Ventana mínima de datos reales antes de confiar en parpadeos_min. Recién
-// iniciada la sesión casi no ha pasado tiempo, así que 0 parpadeos todavía
-// no significa "parpadeo bajo" (backend/fatigue.py lo clasificaría como
-// "leve" de entrada) — solo significa que aún no hay suficiente muestra.
+const CALIBRATION_SECONDS = 5;
+const CLOSURE_RATIO = 0.75;
+const PERCLOS_WINDOW_MS = 60_000;
+const METRICS_SEND_INTERVAL_MS = 15_000;
 const MIN_WINDOW_FOR_METRICS_MS = 20_000;
 
 const videoEl = document.getElementById("webcam");
 const startBtn = document.getElementById("start-btn");
 const stopBtn = document.getElementById("stop-btn");
 const momentoSelect = document.getElementById("mon-momento-select");
+const nivelSelect = document.getElementById("mon-nivel-select");
 
 let camera = null;
 let faceMesh = null;
@@ -38,9 +23,15 @@ let baselineEar = null;
 let calibrationSamples = [];
 let calibrationStartedAt = null;
 
-let earHistory = []; // { t: timestampMs, ear: number, closed: boolean }
+let earHistory = [];
 let wasClosed = false;
 let blinkTimestamps = [];
+let closureStartedAt = null;
+let closureDurations = [];
+
+let lastIrisPoint = null;
+let lastIrisTime = null;
+let ocularVelocitySamples = [];
 
 let sendIntervalHandle = null;
 
@@ -55,9 +46,15 @@ function eyeAspectRatio(landmarks, eyeIndices) {
   return vertical / (2 * horizontal);
 }
 
+function averageIrisCenter(landmarks) {
+  const right = landmarks[RIGHT_IRIS_CENTER];
+  const left = landmarks[LEFT_IRIS_CENTER];
+  return { x: (right.x + left.x) / 2, y: (right.y + left.y) / 2 };
+}
+
 function onFaceMeshResults(results) {
   if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
-    return; // sin rostro detectado en este fotograma
+    return;
   }
   const landmarks = results.multiFaceLandmarks[0];
 
@@ -67,7 +64,6 @@ function onFaceMeshResults(results) {
 
   const now = Date.now();
 
-  // --- Fase 1: calibración de línea base personalizada (AEAR) ---
   if (baselineEar === null) {
     if (calibrationStartedAt === null) calibrationStartedAt = now;
     calibrationSamples.push(ear);
@@ -77,26 +73,46 @@ function onFaceMeshResults(results) {
       baselineEar = calibrationSamples.reduce((a, b) => a + b, 0) / calibrationSamples.length;
       console.info(`Línea base de EAR calibrada: ${baselineEar.toFixed(3)}`);
     }
-    return; // no se registran métricas todavía durante la calibración
+    return;
   }
 
-  // --- Fase 2: monitoreo normal ---
   const closureThreshold = baselineEar * CLOSURE_RATIO;
   const closed = ear < closureThreshold;
 
   if (closed && !wasClosed) {
     blinkTimestamps.push(now);
+    closureStartedAt = now;
+  }
+  if (!closed && wasClosed && closureStartedAt !== null) {
+    closureDurations.push({ t: now, duration: now - closureStartedAt });
+    closureStartedAt = null;
   }
   wasClosed = closed;
 
   earHistory.push({ t: now, ear, closed });
 
-  // Descarta muestras fuera de la ventana móvil de PERCLOS/parpadeo.
+  const irisPoint = averageIrisCenter(landmarks);
+  if (lastIrisPoint !== null && lastIrisTime !== null) {
+    const dt = (now - lastIrisTime) / 1000;
+    if (dt > 0) {
+      ocularVelocitySamples.push({ t: now, speed: distance(irisPoint, lastIrisPoint) / dt });
+    }
+  }
+  lastIrisPoint = irisPoint;
+  lastIrisTime = now;
+
   const cutoff = now - PERCLOS_WINDOW_MS;
   earHistory = earHistory.filter((s) => s.t >= cutoff);
   blinkTimestamps = blinkTimestamps.filter((t) => t >= cutoff);
+  closureDurations = closureDurations.filter((s) => s.t >= cutoff);
+  ocularVelocitySamples = ocularVelocitySamples.filter((s) => s.t >= cutoff);
 
   updateMetricsDisplay(ear);
+}
+
+function averageOf(list, key) {
+  if (list.length === 0) return 0;
+  return list.reduce((a, s) => a + s[key], 0) / list.length;
 }
 
 function updateMetricsDisplay(currentEar) {
@@ -112,6 +128,8 @@ function updateMetricsDisplay(currentEar) {
 
   document.getElementById("metric-perclos").textContent = perclos.toFixed(1);
   document.getElementById("metric-parpadeo").textContent = parpadeosMin.toFixed(1);
+  document.getElementById("metric-cierre").textContent = averageOf(closureDurations, "duration").toFixed(0);
+  document.getElementById("metric-velocidad").textContent = averageOf(ocularVelocitySamples, "speed").toFixed(3);
 }
 
 function currentMetrics() {
@@ -125,11 +143,16 @@ function currentMetrics() {
   const windowMinutes = Math.min(PERCLOS_WINDOW_MS, Date.now() - earHistory[0].t) / 60_000;
   const parpadeosMin = windowMinutes > 0 ? blinkTimestamps.length / windowMinutes : 0;
 
-  return { ear: avgEar, perclos, parpadeos_min: parpadeosMin };
+  return {
+    ear: avgEar,
+    perclos,
+    parpadeos_min: parpadeosMin,
+    tiempo_cierre: averageOf(closureDurations, "duration"),
+    velocidad_ocular: averageOf(ocularVelocitySamples, "speed"),
+    nivel_subjetivo: Number(nivelSelect.value),
+  };
 }
 
-// RF06: mensajes y clase CSS de la alerta visual para cada nivel de fatiga
-// que devuelve el backend (backend/fatigue.py es la fuente única de verdad).
 const MENSAJES_ALERTA = {
   leve: "Fatiga visual leve detectada. Considera tomar un descanso breve.",
   moderada: "Fatiga visual moderada. Te recomendamos detener la sesión y descansar los ojos.",
@@ -142,7 +165,6 @@ function actualizarAlertaFatiga(nivelFatiga) {
 
   const mensaje = MENSAJES_ALERTA[nivelFatiga];
   if (!mensaje) {
-    // "sin_fatiga" (o nivel desconocido): no hay nada que alertar.
     alertaEl.hidden = true;
     alertaEl.textContent = "";
     return;
@@ -162,8 +184,6 @@ async function sendMetrics() {
       method: "POST",
       body: JSON.stringify({ actividad: "lectura", ...metrics }),
     });
-    // NIVEL_LABEL/NIVEL_CLASE vienen de dashboard.js: mismas etiquetas y
-    // colores que las insignias de "Sesiones recientes" en el panel.
     document.getElementById("metric-fatiga").textContent =
       NIVEL_LABEL[result.nivel_fatiga] || result.nivel_fatiga;
     const fatigaCard = document.getElementById("metric-fatiga-card");
@@ -177,8 +197,6 @@ async function sendMetrics() {
 }
 
 async function startMonitoring() {
-  // 1. Crear la sesión en el backend (RF07: momento pre/post opcional
-  // para la validación experimental de la jornada de estudio).
   const momento = momentoSelect.value || null;
   const session = await apiFetch("/sessions", {
     method: "POST",
@@ -187,16 +205,19 @@ async function startMonitoring() {
   sesionId = session.sesion_id;
   momentoSelect.disabled = true;
 
-  // 2. Reiniciar el estado de calibración y métricas.
   baselineEar = null;
   calibrationSamples = [];
   calibrationStartedAt = null;
   earHistory = [];
   blinkTimestamps = [];
   wasClosed = false;
-  actualizarAlertaFatiga(null); // limpia cualquier alerta de una sesión anterior
+  closureStartedAt = null;
+  closureDurations = [];
+  lastIrisPoint = null;
+  lastIrisTime = null;
+  ocularVelocitySamples = [];
+  actualizarAlertaFatiga(null);
 
-  // 3. Inicializar MediaPipe FaceMesh.
   faceMesh = new FaceMesh({
     locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
   });
@@ -208,7 +229,6 @@ async function startMonitoring() {
   });
   faceMesh.onResults(onFaceMeshResults);
 
-  // 4. Iniciar la cámara y alimentar cada fotograma a FaceMesh.
   camera = new Camera(videoEl, {
     onFrame: async () => {
       await faceMesh.send({ image: videoEl });
@@ -218,7 +238,6 @@ async function startMonitoring() {
   });
   await camera.start();
 
-  // 5. Enviar métricas al backend periódicamente.
   sendIntervalHandle = setInterval(sendMetrics, METRICS_SEND_INTERVAL_MS);
 
   startBtn.hidden = true;
@@ -227,7 +246,7 @@ async function startMonitoring() {
 
 async function stopMonitoring() {
   if (sendIntervalHandle) clearInterval(sendIntervalHandle);
-  await sendMetrics(); // último envío antes de cerrar
+  await sendMetrics();
 
   if (camera) camera.stop();
   if (faceMesh) faceMesh.close();
@@ -243,6 +262,7 @@ async function stopMonitoring() {
   actualizarAlertaFatiga(null);
   momentoSelect.disabled = false;
   momentoSelect.value = "";
+  nivelSelect.value = "3";
 
   startBtn.hidden = false;
   stopBtn.hidden = true;
@@ -260,8 +280,6 @@ stopBtn.addEventListener("click", () => {
 });
 
 document.getElementById("mon-back-btn").addEventListener("click", async () => {
-  // Si hay una sesión activa, la finaliza antes de volver al panel para no
-  // dejar una sesión "en curso" huérfana.
   if (!stopBtn.hidden) {
     await stopMonitoring().catch((err) => console.error(err));
   }

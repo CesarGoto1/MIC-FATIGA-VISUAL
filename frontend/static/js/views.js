@@ -1,8 +1,3 @@
-/**
- * Cambia entre las tres vistas de la app (login/registro, panel principal,
- * sesión de monitoreo). Centralizado aquí porque auth.js, dashboard.js y
- * monitoreo.js necesitan navegar entre ellas.
- */
 const authView = document.getElementById("auth-view");
 const dashboardView = document.getElementById("dashboard-view");
 const monitoreoView = document.getElementById("monitoreo-view");

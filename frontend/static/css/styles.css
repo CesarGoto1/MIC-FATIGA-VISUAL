@@ -16,9 +16,6 @@
   box-sizing: border-box;
 }
 
-/* Algunas clases (ej. .btn-primary) fijan su propio "display", que empata
-   en especificidad con [hidden] del navegador y puede ganarle por orden de
-   cascada. Esta regla asegura que hidden SIEMPRE oculte, sin excepción. */
 [hidden] {
   display: none !important;
 }
@@ -32,8 +29,6 @@ body {
 h1 {
   font-size: 1.4rem;
 }
-
-/* --- Vista de autenticación (login / registro) --- */
 
 #auth-view[hidden] {
   display: none;
@@ -49,7 +44,6 @@ h1 {
   min-height: 100vh;
 }
 
-/* Panel visual de marca (oculto en pantallas angostas, ver media query) */
 .auth-visual {
   position: relative;
   flex: 0 0 46%;
@@ -218,7 +212,6 @@ h1 {
   color: rgba(255, 255, 255, 0.82);
 }
 
-/* Panel del formulario */
 .auth-panel {
   flex: 1;
   display: flex;
@@ -444,7 +437,6 @@ h1 {
   margin: 16px 0 0;
 }
 
-/* En pantallas angostas el panel visual no cabe: solo se muestra el formulario */
 @media (max-width: 860px) {
   .auth-visual {
     display: none;
@@ -453,8 +445,6 @@ h1 {
     padding: 32px 20px;
   }
 }
-
-/* --- Panel principal (dashboard) --- */
 
 #dashboard-view {
   min-height: 100vh;
@@ -717,6 +707,40 @@ h1 {
   color: var(--auth-ink);
 }
 
+.diagnosis-summary {
+  margin: 0 0 10px;
+  font-weight: 700;
+}
+
+.diagnosis-param {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--auth-border);
+}
+.diagnosis-param__titulo {
+  margin: 0 0 4px;
+  font-weight: 700;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.diagnosis-param__valores {
+  font-weight: 500;
+  color: var(--auth-ink-soft);
+}
+.diagnosis-param__texto {
+  margin: 4px 0 0;
+}
+
+.diagnosis-recs {
+  margin: 12px 0 0;
+  padding-left: 20px;
+}
+.diagnosis-recs li {
+  margin-bottom: 4px;
+}
+
 .sessions-empty {
   margin: 0;
   padding: 28px;
@@ -736,8 +760,6 @@ h1 {
     padding: 28px 20px 48px;
   }
 }
-
-/* --- Vista de monitoreo --- */
 
 #monitoreo-view {
   min-height: 100vh;
@@ -875,9 +897,6 @@ button {
   transform: translateY(-1px);
 }
 
-/* RF06: alerta visual de fatiga. Oculta por defecto (nivel "sin_fatiga");
-   monitoreo.js alterna las clases .alerta-leve / .alerta-moderada según
-   el nivel_fatiga que devuelve el backend (fuente única de verdad, RF05). */
 #fatiga-alerta {
   margin: 0;
   padding: 14px 16px;

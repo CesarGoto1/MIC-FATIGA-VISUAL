@@ -9,7 +9,6 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./SQL/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
 
   n8n:
     image: docker.n8n.io/n8nio/n8n

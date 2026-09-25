@@ -4,7 +4,6 @@ const tabLogin = document.getElementById("tab-login");
 const tabRegister = document.getElementById("tab-register");
 const loginSection = document.getElementById("login-section");
 const registerSection = document.getElementById("register-section");
-const authTabs = document.querySelector(".auth-tabs");
 const authHeading = document.getElementById("auth-heading");
 const authSubheading = document.getElementById("auth-subheading");
 
@@ -16,7 +15,6 @@ function showTab(tab) {
   tabRegister.setAttribute("aria-selected", String(!isLogin));
   loginSection.hidden = !isLogin;
   registerSection.hidden = isLogin;
-  authTabs.dataset.active = isLogin ? "login" : "register";
   authHeading.textContent = isLogin ? "Bienvenido de nuevo" : "Crea tu cuenta";
   authSubheading.textContent = isLogin
     ? "Ingresa tus datos para continuar."
@@ -27,7 +25,7 @@ function showTab(tab) {
 tabLogin.addEventListener("click", () => showTab("login"));
 tabRegister.addEventListener("click", () => showTab("register"));
 
-document.querySelectorAll(".auth-field__toggle").forEach((button) => {
+document.querySelectorAll(".field__toggle").forEach((button) => {
   const input = document.getElementById(button.dataset.toggleFor);
   const eyeIcon = button.querySelector(".icon-eye");
   const eyeOffIcon = button.querySelector(".icon-eye-off");

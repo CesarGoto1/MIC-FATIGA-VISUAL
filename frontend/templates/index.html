@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Monitoreo de fatiga visual</title>
+  <meta name="color-scheme" content="light dark" />
+  <title>EyeCare · Monitoreo de fatiga visual</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -11,23 +12,81 @@
 </head>
 <body>
 
+  <!-- Sprite de íconos: se referencian con <svg><use href="#i-..."/></svg> -->
+  <svg xmlns="http://www.w3.org/2000/svg" hidden>
+    <defs>
+      <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+        <path d="M1.5 12S5.5 4.5 12 4.5 22.5 12 22.5 12 18.5 19.5 12 19.5 1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3.4"/>
+      </symbol>
+      <symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><path d="M3 3l18 18"/>
+      </symbol>
+      <symbol id="i-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2.5 12h4l2.2-6 4 12 2.2-6h6.6"/>
+      </symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2.75 4.5 5.75v5.4c0 4.6 3.2 7.9 7.5 9.6 4.3-1.7 7.5-5 7.5-9.6v-5.4L12 2.75Z"/><path d="M9 12.2l2.1 2.1 4-4.2"/>
+      </symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3 3.5 7.5v5.4c0 4.6 3.5 8 8.5 9.6 5-1.6 8.5-5 8.5-9.6V7.5L12 3Z"/><path d="M12 8v5M12 16.2v.1"/>
+      </symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3a5.2 5.2 0 0 0-5.2 5.2v2.9c0 .8-.3 1.6-.9 2.2l-1 1c-.6.6-.2 1.7.7 1.7h12.8c.9 0 1.3-1.1.7-1.7l-1-1c-.6-.6-.9-1.4-.9-2.2V8.2A5.2 5.2 0 0 0 12 3Z"/><path d="M9.6 19a2.4 2.4 0 0 0 4.8 0"/>
+      </symbol>
+      <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M4 6.5 12 13l8-6.5"/>
+      </symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <rect x="4.5" y="10.5" width="15" height="9.5" rx="2.2"/><path d="M7.5 10.5V7.8a4.5 4.5 0 0 1 9 0v2.7"/>
+      </symbol>
+      <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <circle cx="12" cy="8.2" r="3.2"/><path d="M5 19c0-3.3 3.1-5.3 7-5.3s7 2 7 5.3"/>
+      </symbol>
+      <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 12h14M13 6l6 6-6 6"/>
+      </symbol>
+      <symbol id="i-arrow-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 12H5M11 6l-6 6 6 6"/>
+      </symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <rect x="3.5" y="4.5" width="17" height="16" rx="3"/><path d="M3.5 9.5h17M8 3v3M16 3v3"/>
+      </symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>
+      </symbol>
+      <symbol id="i-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>
+      </symbol>
+      <symbol id="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3V9Z"/>
+      </symbol>
+      <symbol id="i-monitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>
+      </symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
+      </symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/>
+      </symbol>
+      <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M6 6l12 12M18 6 6 18"/>
+      </symbol>
+      <symbol id="i-sparkle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+        <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3Z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16Z"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <!-- ============================ AUTENTICACIÓN ============================ -->
   <main id="auth-view">
     <div class="auth-stage">
-
-      <div class="auth-visual">
-        <span class="auth-visual__blob auth-visual__blob--a" aria-hidden="true"></span>
-        <span class="auth-visual__blob auth-visual__blob--b" aria-hidden="true"></span>
-
-        <div class="auth-brand">
-          <span class="auth-brand__icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M1.5 12S5.5 4.5 12 4.5 22.5 12 22.5 12 18.5 19.5 12 19.5 1.5 12 1.5 12Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-              <circle cx="12" cy="12" r="3.4" stroke="currentColor" stroke-width="1.6"/>
-            </svg>
-          </span>
+      <aside class="auth-visual">
+        <div class="brand brand--inverse">
+          <span class="brand__icon" aria-hidden="true"><svg><use href="#i-eye"/></svg></span>
           <div>
-            <p class="auth-brand__title">EyeCare</p>
-            <p class="auth-brand__subtitle">Monitoreo de fatiga visual</p>
+            <p class="brand__title">EyeCare</p>
+            <p class="brand__subtitle">Monitoreo de fatiga visual</p>
           </div>
         </div>
 
@@ -35,401 +94,393 @@
           <div class="auth-hero__eye" aria-hidden="true">
             <span class="pulse-ring"></span>
             <span class="pulse-ring pulse-ring--delay"></span>
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M1.5 12S5.5 4.5 12 4.5 22.5 12 22.5 12 18.5 19.5 12 19.5 1.5 12 1.5 12Z" stroke="#ffffff" stroke-width="1.3" stroke-linejoin="round"/>
-              <circle cx="12" cy="12" r="3.4" stroke="#ffffff" stroke-width="1.3"/>
-            </svg>
+            <svg><use href="#i-eye"/></svg>
           </div>
           <p class="auth-hero__tagline">Detecta la fatiga visual antes de que te canses.</p>
         </div>
 
-        <div class="auth-features">
-          <div class="auth-feature">
-            <span class="auth-feature__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M2.5 12h4l2.2-6 4 12 2.2-6h6.6" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </span>
+        <ul class="auth-features">
+          <li class="auth-feature">
+            <span class="auth-feature__icon" aria-hidden="true"><svg><use href="#i-pulse"/></svg></span>
             <div>
-              <span class="auth-feature__title">Detección en tiempo real</span>
-              <p class="auth-feature__text">Analiza EAR, PERCLOS y parpadeos por minuto.</p>
+              <strong>Medición en tiempo real</strong>
+              <p>PERCLOS, parpadeos por minuto y duración de cierre con tu cámara web.</p>
             </div>
-          </div>
-          <div class="auth-feature">
-            <span class="auth-feature__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2.75 4.5 5.75v5.4c0 4.6 3.2 7.9 7.5 9.6 4.3-1.7 7.5-5 7.5-9.6v-5.4L12 2.75Z" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round"/>
-                <path d="M9 12.2l2.1 2.1 4-4.2" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </span>
+          </li>
+          <li class="auth-feature">
+            <span class="auth-feature__icon" aria-hidden="true"><svg><use href="#i-shield"/></svg></span>
             <div>
-              <span class="auth-feature__title">Privacidad por diseño</span>
-              <p class="auth-feature__text">El video de tu cámara nunca sale del navegador.</p>
+              <strong>Privacidad por diseño</strong>
+              <p>El video y tus archivos nunca salen del navegador; solo se guardan números.</p>
             </div>
-          </div>
-          <div class="auth-feature">
-            <span class="auth-feature__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 3a5.2 5.2 0 0 0-5.2 5.2v2.9c0 .8-.3 1.6-.9 2.2l-1 1c-.6.6-.2 1.7.7 1.7h12.8c.9 0 1.3-1.1.7-1.7l-1-1c-.6-.6-.9-1.4-.9-2.2V8.2A5.2 5.2 0 0 0 12 3Z" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round"/>
-                <path d="M9.6 19a2.4 2.4 0 0 0 4.8 0" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"/>
-              </svg>
-            </span>
+          </li>
+          <li class="auth-feature">
+            <span class="auth-feature__icon" aria-hidden="true"><svg><use href="#i-bell"/></svg></span>
             <div>
-              <span class="auth-feature__title">Alertas inteligentes</span>
-              <p class="auth-feature__text">Te avisamos apenas se detecten signos de fatiga.</p>
+              <strong>Alertas preventivas</strong>
+              <p>Avisos discretos y pausas guiadas 20-20-20 cuando aparecen signos de fatiga.</p>
             </div>
-          </div>
-        </div>
-      </div>
+          </li>
+        </ul>
+      </aside>
 
       <div class="auth-panel">
-        <div class="auth-card">
-          <div class="auth-card__header">
+        <div class="card auth-card">
+          <header class="auth-card__header">
             <h1 id="auth-heading">Bienvenido de nuevo</h1>
-            <p id="auth-subheading">Ingresa tus datos para continuar.</p>
-          </div>
+            <p id="auth-subheading" class="muted">Ingresa tus datos para continuar.</p>
+          </header>
 
-          <div class="auth-tabs" role="tablist">
-            <button type="button" class="auth-tab is-active" id="tab-login" role="tab" aria-selected="true" aria-controls="login-section">
-              Iniciar sesión
-            </button>
-            <button type="button" class="auth-tab" id="tab-register" role="tab" aria-selected="false" aria-controls="register-section">
-              Crear cuenta
-            </button>
-            <span class="auth-tabs__indicator" aria-hidden="true"></span>
+          <div class="segmented" role="tablist">
+            <button type="button" class="segmented__item is-active" id="tab-login" role="tab" aria-selected="true" aria-controls="login-section">Iniciar sesión</button>
+            <button type="button" class="segmented__item" id="tab-register" role="tab" aria-selected="false" aria-controls="register-section">Crear cuenta</button>
           </div>
 
           <section id="login-section" role="tabpanel" aria-labelledby="tab-login">
-            <form id="login-form" class="auth-form" novalidate>
-              <label class="auth-field">
-                <span class="auth-field__label">Correo</span>
-                <span class="auth-field__control">
-                  <span class="auth-field__icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="3" y="5" width="18" height="14" rx="2.5" stroke="currentColor" stroke-width="1.6"/>
-                      <path d="M4 6.5 12 13l8-6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                  </span>
+            <form id="login-form" class="form" novalidate>
+              <label class="field">
+                <span class="field__label">Correo</span>
+                <span class="field__control">
+                  <svg class="field__icon" aria-hidden="true"><use href="#i-mail"/></svg>
                   <input type="email" id="login-email" placeholder="tucorreo@ejemplo.com" autocomplete="email" required />
                 </span>
               </label>
-              <label class="auth-field">
-                <span class="auth-field__label">Contraseña</span>
-                <span class="auth-field__control auth-field__control--has-toggle">
-                  <span class="auth-field__icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="4.5" y="10.5" width="15" height="9.5" rx="2.2" stroke="currentColor" stroke-width="1.6"/>
-                      <path d="M7.5 10.5V7.8a4.5 4.5 0 0 1 9 0v2.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-                    </svg>
-                  </span>
+              <label class="field">
+                <span class="field__label">Contraseña</span>
+                <span class="field__control">
+                  <svg class="field__icon" aria-hidden="true"><use href="#i-lock"/></svg>
                   <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" required />
-                  <button type="button" class="auth-field__toggle" data-toggle-for="login-password" aria-label="Mostrar u ocultar contraseña">
-                    <svg class="icon-eye" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M1.5 12S5.5 4.5 12 4.5 22.5 12 22.5 12 18.5 19.5 12 19.5 1.5 12 1.5 12Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-                      <circle cx="12" cy="12" r="3.4" stroke="currentColor" stroke-width="1.6"/>
-                    </svg>
-                    <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" hidden>
-                      <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-                      <path d="M3 3l18 18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-                    </svg>
+                  <button type="button" class="field__toggle" data-toggle-for="login-password" aria-label="Mostrar u ocultar contraseña">
+                    <svg class="icon-eye"><use href="#i-eye"/></svg>
+                    <svg class="icon-eye-off" hidden><use href="#i-eye-off"/></svg>
                   </button>
                 </span>
               </label>
-              <button type="submit" class="auth-submit">
+              <button type="submit" class="btn btn--primary btn--block auth-submit">
                 <span class="auth-submit__label">Ingresar</span>
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                  <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
+                <svg aria-hidden="true"><use href="#i-arrow-right"/></svg>
               </button>
             </form>
           </section>
 
           <section id="register-section" role="tabpanel" aria-labelledby="tab-register" hidden>
-            <form id="register-form" class="auth-form" novalidate>
-              <label class="auth-field">
-                <span class="auth-field__label">Nombre</span>
-                <span class="auth-field__control">
-                  <span class="auth-field__icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="12" cy="8.2" r="3.2" stroke="currentColor" stroke-width="1.6"/>
-                      <path d="M5 19c0-3.3 3.1-5.3 7-5.3s7 2 7 5.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-                    </svg>
-                  </span>
+            <form id="register-form" class="form" novalidate>
+              <label class="field">
+                <span class="field__label">Nombre</span>
+                <span class="field__control">
+                  <svg class="field__icon" aria-hidden="true"><use href="#i-user"/></svg>
                   <input type="text" id="register-nombre" placeholder="Tu nombre" autocomplete="name" required />
                 </span>
               </label>
-              <label class="auth-field">
-                <span class="auth-field__label">Correo</span>
-                <span class="auth-field__control">
-                  <span class="auth-field__icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="3" y="5" width="18" height="14" rx="2.5" stroke="currentColor" stroke-width="1.6"/>
-                      <path d="M4 6.5 12 13l8-6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                  </span>
+              <label class="field">
+                <span class="field__label">Correo</span>
+                <span class="field__control">
+                  <svg class="field__icon" aria-hidden="true"><use href="#i-mail"/></svg>
                   <input type="email" id="register-email" placeholder="tucorreo@ejemplo.com" autocomplete="email" required />
                 </span>
               </label>
-              <label class="auth-field">
-                <span class="auth-field__label">Contraseña</span>
-                <span class="auth-field__control auth-field__control--has-toggle">
-                  <span class="auth-field__icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="4.5" y="10.5" width="15" height="9.5" rx="2.2" stroke="currentColor" stroke-width="1.6"/>
-                      <path d="M7.5 10.5V7.8a4.5 4.5 0 0 1 9 0v2.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-                    </svg>
-                  </span>
+              <label class="field">
+                <span class="field__label">Contraseña</span>
+                <span class="field__control">
+                  <svg class="field__icon" aria-hidden="true"><use href="#i-lock"/></svg>
                   <input type="password" id="register-password" placeholder="Mínimo 8 caracteres" autocomplete="new-password" required minlength="8" />
-                  <button type="button" class="auth-field__toggle" data-toggle-for="register-password" aria-label="Mostrar u ocultar contraseña">
-                    <svg class="icon-eye" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M1.5 12S5.5 4.5 12 4.5 22.5 12 22.5 12 18.5 19.5 12 19.5 1.5 12 1.5 12Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-                      <circle cx="12" cy="12" r="3.4" stroke="currentColor" stroke-width="1.6"/>
-                    </svg>
-                    <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" hidden>
-                      <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-                      <path d="M3 3l18 18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-                    </svg>
+                  <button type="button" class="field__toggle" data-toggle-for="register-password" aria-label="Mostrar u ocultar contraseña">
+                    <svg class="icon-eye"><use href="#i-eye"/></svg>
+                    <svg class="icon-eye-off" hidden><use href="#i-eye-off"/></svg>
                   </button>
                 </span>
               </label>
-              <button type="submit" class="auth-submit">
+              <button type="submit" class="btn btn--primary btn--block auth-submit">
                 <span class="auth-submit__label">Crear cuenta</span>
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                  <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
+                <svg aria-hidden="true"><use href="#i-arrow-right"/></svg>
               </button>
             </form>
           </section>
 
-          <p id="auth-error" class="error" hidden></p>
+          <p id="auth-error" class="notice notice--error" role="alert" hidden></p>
         </div>
       </div>
-
     </div>
   </main>
 
+  <!-- ============================ PANEL PRINCIPAL ============================ -->
   <main id="dashboard-view" hidden>
-    <header class="dash-header">
-      <div class="dash-header__brand">
-        <span class="dash-header__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M1.5 12S5.5 4.5 12 4.5 22.5 12 22.5 12 18.5 19.5 12 19.5 1.5 12 1.5 12Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-            <circle cx="12" cy="12" r="3.4" stroke="currentColor" stroke-width="1.6"/>
-          </svg>
-        </span>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand__icon" aria-hidden="true"><svg><use href="#i-eye"/></svg></span>
         <div>
-          <p class="dash-header__title">EyeCare</p>
-          <p class="dash-header__subtitle">Monitoreo de fatiga visual</p>
+          <p class="brand__title">EyeCare</p>
+          <p class="brand__subtitle">Monitoreo de fatiga visual</p>
         </div>
       </div>
-      <div class="dash-header__user">
-        <span class="dash-header__greeting">Hola, <span id="dash-usuario-nombre"></span></span>
-        <button type="button" id="dash-logout-btn" class="btn-ghost">Cerrar sesión</button>
+      <div class="topbar__actions">
+        <button type="button" class="btn btn--icon theme-toggle" aria-label="Cambiar tema claro u oscuro">
+          <svg class="theme-toggle__moon"><use href="#i-moon"/></svg>
+          <svg class="theme-toggle__sun"><use href="#i-sun"/></svg>
+        </button>
+        <span class="topbar__user">Hola, <strong id="dash-usuario-nombre"></strong></span>
+        <button type="button" id="dash-logout-btn" class="btn btn--ghost">Cerrar sesión</button>
       </div>
     </header>
 
-    <div class="dash-content">
-      <section class="dash-hero">
+    <div class="page">
+      <section class="hero card">
         <div>
           <h1>Tu resumen de fatiga visual</h1>
-          <p>Revisa cómo te ha ido en tus últimas sesiones y comienza una nueva cuando quieras.</p>
+          <p class="muted">Registra una sesión <strong>antes</strong> y otra <strong>después</strong> de tu jornada de estudio para ver cómo cambian tus indicadores.</p>
         </div>
-        <button type="button" id="dash-start-btn" class="btn-primary">
-          <span>Iniciar nueva sesión</span>
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+        <button type="button" id="dash-start-btn" class="btn btn--primary btn--lg">
+          <span>Nueva sesión</span>
+          <svg aria-hidden="true"><use href="#i-arrow-right"/></svg>
         </button>
       </section>
 
-      <section class="dash-stats">
-        <div class="stat-card">
-          <span class="stat-card__icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="3.5" y="4.5" width="17" height="16" rx="3" stroke="currentColor" stroke-width="1.6"/>
-              <path d="M3.5 9.5h17" stroke="currentColor" stroke-width="1.6"/>
-              <path d="M8 3v3M16 3v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-            </svg>
-          </span>
-          <div>
-            <p class="stat-card__value" id="stat-total">–</p>
-            <p class="stat-card__label">Sesiones totales</p>
-          </div>
+      <section class="stats" aria-label="Estadísticas generales">
+        <div class="stat">
+          <span class="stat__icon" aria-hidden="true"><svg><use href="#i-calendar"/></svg></span>
+          <div><p class="stat__value" id="stat-total">–</p><p class="stat__label">Sesiones totales</p></div>
         </div>
-        <div class="stat-card">
-          <span class="stat-card__icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M2.5 12h4l2.2-6 4 12 2.2-6h6.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
-          <div>
-            <p class="stat-card__value" id="stat-week">–</p>
-            <p class="stat-card__label">Esta semana</p>
-          </div>
+        <div class="stat">
+          <span class="stat__icon" aria-hidden="true"><svg><use href="#i-pulse"/></svg></span>
+          <div><p class="stat__value" id="stat-week">–</p><p class="stat__label">Esta semana</p></div>
         </div>
-        <div class="stat-card">
-          <span class="stat-card__icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 3 3.5 7.5v5.4c0 4.6 3.5 8 8.5 9.6 5-1.6 8.5-5 8.5-9.6V7.5L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-              <path d="M12 8v5M12 16.2v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-            </svg>
-          </span>
-          <div>
-            <p class="stat-card__value" id="stat-alerts">–</p>
-            <p class="stat-card__label">Con fatiga detectada</p>
-          </div>
+        <div class="stat">
+          <span class="stat__icon stat__icon--warn" aria-hidden="true"><svg><use href="#i-alert"/></svg></span>
+          <div><p class="stat__value" id="stat-alerts">–</p><p class="stat__label">Con fatiga detectada</p></div>
         </div>
-        <div class="stat-card">
-          <span class="stat-card__icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/>
-              <path d="M12 7.5V12l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
-          <div>
-            <p class="stat-card__value" id="stat-last">–</p>
-            <p class="stat-card__label">Última sesión</p>
-          </div>
+        <div class="stat">
+          <span class="stat__icon" aria-hidden="true"><svg><use href="#i-clock"/></svg></span>
+          <div><p class="stat__value" id="stat-last">–</p><p class="stat__label">Última sesión</p></div>
         </div>
       </section>
 
-      <section class="dash-sessions">
-        <h2>Sesiones recientes</h2>
-        <div id="dash-sessions-list" class="sessions-list"></div>
-        <p id="dash-sessions-empty" class="sessions-empty" hidden>
-          Todavía no tienes sesiones registradas. Inicia la primera para ver tu resumen aquí.
-        </p>
-        <p id="dash-sessions-error" class="error" hidden></p>
+      <section class="card compare" id="dash-compare" hidden>
+        <header class="section-head">
+          <h2>Antes vs. después de la jornada</h2>
+          <p class="muted">Promedio de tus sesiones según el momento en que las registraste.</p>
+        </header>
+        <div class="compare__grid" id="dash-compare-grid"></div>
       </section>
+
+      <section class="card">
+        <header class="section-head">
+          <h2>Sesiones recientes</h2>
+        </header>
+        <div id="dash-sessions-list" class="sessions"></div>
+        <div id="dash-sessions-empty" class="empty" hidden>
+          <svg aria-hidden="true"><use href="#i-eye"/></svg>
+          <p>Todavía no tienes sesiones. Inicia la primera para ver tu resumen aquí.</p>
+        </div>
+        <p id="dash-sessions-error" class="notice notice--error" hidden></p>
+      </section>
+
+      <p class="disclaimer">EyeCare es una herramienta preventiva y de concienciación. No reemplaza la evaluación de un profesional de la salud visual ni emite diagnósticos médicos.</p>
     </div>
   </main>
 
+  <!-- ============================ MONITOREO ============================ -->
   <main id="monitoreo-view" hidden>
-    <header class="mon-header">
-      <button type="button" id="mon-back-btn" class="btn-ghost">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M19 12H5M11 6l-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <span>Volver al panel</span>
+    <header class="topbar topbar--compact">
+      <button type="button" id="mon-back-btn" class="btn btn--ghost">
+        <svg aria-hidden="true"><use href="#i-arrow-left"/></svg>
+        <span>Panel</span>
       </button>
-      <p class="mon-header__user">Usuario: <span id="usuario-nombre"></span></p>
+      <div class="mon-status">
+        <span id="mon-status-pill" class="pill pill--idle"><span class="pill__dot"></span><span id="mon-status-text">Preparando</span></span>
+        <span id="mon-timer" class="mon-timer" hidden>00:00</span>
+      </div>
+      <div class="topbar__actions">
+        <button type="button" class="btn btn--icon theme-toggle" aria-label="Cambiar tema claro u oscuro">
+          <svg class="theme-toggle__moon"><use href="#i-moon"/></svg>
+          <svg class="theme-toggle__sun"><use href="#i-sun"/></svg>
+        </button>
+        <button type="button" id="stop-btn" class="btn btn--danger" hidden>Finalizar sesión</button>
+      </div>
     </header>
 
-    <div class="mon-content">
-      <section class="mon-video-card">
-        <div class="mon-video-card__frame">
-          <video id="webcam" autoplay playsinline muted></video>
-          <canvas id="overlay" hidden></canvas>
-        </div>
-      </section>
+    <!-- Paso 1: preparación de la sesión -->
+    <section id="mon-setup" class="page page--narrow">
+      <form id="setup-form" class="card setup" novalidate>
+        <header class="setup__header">
+          <h1>Prepara tu sesión</h1>
+          <p class="muted">Tres preguntas rápidas antes de activar la cámara.</p>
+        </header>
 
-      <section class="mon-side">
-        <p id="fatiga-alerta" role="alert" aria-live="assertive" hidden></p>
+        <fieldset class="setup__step">
+          <legend><span class="step-num">1</span> ¿En qué momento de tu jornada estás?</legend>
+          <div class="choice-grid choice-grid--2">
+            <label class="choice">
+              <input type="radio" name="momento" value="pre" required />
+              <span class="choice__body"><strong>Antes de estudiar</strong><small>Inicio de la jornada académica</small></span>
+            </label>
+            <label class="choice">
+              <input type="radio" name="momento" value="post" />
+              <span class="choice__body"><strong>Después de estudiar</strong><small>Final de la jornada académica</small></span>
+            </label>
+          </div>
+        </fieldset>
 
-        <div id="metricas" class="mon-metrics">
-          <div class="stat-card">
-            <span class="stat-card__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M1.5 12S5.5 4.5 12 4.5 22.5 12 22.5 12 18.5 19.5 12 19.5 1.5 12 1.5 12Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-                <circle cx="12" cy="12" r="3.4" stroke="currentColor" stroke-width="1.6"/>
-              </svg>
-            </span>
-            <div>
-              <p class="stat-card__value"><span id="metric-ear">--</span></p>
-              <p class="stat-card__label">EAR</p>
-            </div>
+        <fieldset class="setup__step">
+          <legend><span class="step-num">2</span> ¿Qué vas a hacer durante la sesión?</legend>
+          <div class="choice-grid choice-grid--3">
+            <label class="choice">
+              <input type="radio" name="actividad" value="lectura" required />
+              <span class="choice__body"><svg aria-hidden="true"><use href="#i-doc"/></svg><strong>Leer un PDF</strong></span>
+            </label>
+            <label class="choice">
+              <input type="radio" name="actividad" value="video" />
+              <span class="choice__body"><svg aria-hidden="true"><use href="#i-play"/></svg><strong>Ver un video</strong></span>
+            </label>
+            <label class="choice">
+              <input type="radio" name="actividad" value="libre" />
+              <span class="choice__body"><svg aria-hidden="true"><use href="#i-monitor"/></svg><strong>Solo monitoreo</strong></span>
+            </label>
           </div>
-          <div class="stat-card">
-            <span class="stat-card__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-                <path d="M4 4l16 16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-              </svg>
-            </span>
-            <div>
-              <p class="stat-card__value"><span id="metric-perclos">--</span>%</p>
-              <p class="stat-card__label">PERCLOS</p>
-            </div>
-          </div>
-          <div class="stat-card">
-            <span class="stat-card__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M2.5 12h4l2.2-6 4 12 2.2-6h6.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </span>
-            <div>
-              <p class="stat-card__value"><span id="metric-parpadeo">--</span></p>
-              <p class="stat-card__label">Parpadeos/min</p>
-            </div>
-          </div>
-          <div class="stat-card" id="metric-fatiga-card">
-            <span class="stat-card__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 3 3.5 7.5v5.4c0 4.6 3.5 8 8.5 9.6 5-1.6 8.5-5 8.5-9.6V7.5L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-                <path d="M12 8v5M12 16.2v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-              </svg>
-            </span>
-            <div>
-              <p class="stat-card__value" id="metric-fatiga">--</p>
-              <p class="stat-card__label">Nivel de fatiga</p>
-            </div>
-          </div>
-          <div class="stat-card">
-            <span class="stat-card__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 6v6l4 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/>
-              </svg>
-            </span>
-            <div>
-              <p class="stat-card__value"><span id="metric-cierre">--</span> ms</p>
-              <p class="stat-card__label">Tiempo de cierre</p>
-            </div>
-          </div>
-          <div class="stat-card">
-            <span class="stat-card__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3 12h5l2-7 4 14 2-7h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </span>
-            <div>
-              <p class="stat-card__value"><span id="metric-velocidad">--</span></p>
-              <p class="stat-card__label">Velocidad ocular</p>
-            </div>
-          </div>
-        </div>
+          <label class="file-drop" id="file-drop" hidden>
+            <input type="file" id="content-file" />
+            <span id="file-drop-text">Selecciona el archivo</span>
+            <small>Se abre solo en tu navegador; nunca se envía al servidor.</small>
+          </label>
+        </fieldset>
 
-        <div class="mon-momento">
-          <label for="mon-momento-select">Momento de la jornada (opcional)</label>
-          <select id="mon-momento-select">
-            <option value="">Sin especificar</option>
-            <option value="pre">Antes de la jornada de estudio</option>
-            <option value="post">Después de la jornada de estudio</option>
-          </select>
-        </div>
+        <fieldset class="setup__step">
+          <legend><span class="step-num">3</span> ¿Qué tan somnoliento te sientes ahora? <small class="muted">(Escala de Karolinska, KSS)</small></legend>
+          <div class="kss" id="kss-inicial" data-kss-name="kss_inicial"></div>
+        </fieldset>
 
-        <div class="mon-momento">
-          <label for="mon-nivel-select">¿Cómo sientes tus ojos ahora?</label>
-          <select id="mon-nivel-select">
-            <option value="1">1 - Muy descansados</option>
-            <option value="2">2 - Descansados</option>
-            <option value="3" selected>3 - Normal</option>
-            <option value="4">4 - Cansados</option>
-            <option value="5">5 - Muy cansados</option>
-          </select>
-        </div>
+        <p id="setup-error" class="notice notice--error" role="alert" hidden></p>
 
-        <div class="mon-actions">
-          <button type="button" id="start-btn" class="btn-primary">
-            <span>Iniciar sesión de monitoreo</span>
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+        <footer class="setup__footer">
+          <p class="muted small"><svg class="inline-icon" aria-hidden="true"><use href="#i-shield"/></svg> La cámara se procesa localmente. Mantén el rostro visible y quieto los primeros 5 segundos para calibrar.</p>
+          <button type="submit" id="start-btn" class="btn btn--primary btn--lg">
+            <span>Activar cámara y comenzar</span>
+            <svg aria-hidden="true"><use href="#i-arrow-right"/></svg>
           </button>
-          <button type="button" id="stop-btn" class="btn-danger" hidden>Finalizar sesión</button>
+        </footer>
+      </form>
+    </section>
+
+    <!-- Paso 2: sesión en curso -->
+    <section id="mon-live" class="mon-live" hidden>
+      <div class="mon-content card" id="mon-content">
+        <iframe id="viewer-pdf" title="Documento PDF" hidden></iframe>
+        <video id="viewer-video" controls playsinline hidden></video>
+        <div id="viewer-empty" class="viewer-empty" hidden>
+          <svg aria-hidden="true"><use href="#i-monitor"/></svg>
+          <h2>Modo solo monitoreo</h2>
+          <p class="muted">Mantén esta pestaña visible mientras trabajas: el navegador pausa la cámara en pestañas ocultas.</p>
         </div>
-      </section>
-    </div>
+
+        <div id="toast" class="toast" role="alert" aria-live="assertive" hidden>
+          <span class="toast__icon" aria-hidden="true"><svg><use href="#i-bell"/></svg></span>
+          <div class="toast__body">
+            <strong id="toast-title"></strong>
+            <p id="toast-text"></p>
+          </div>
+          <button type="button" id="toast-game-btn" class="btn btn--sm btn--primary" hidden>Jugar 1 min</button>
+          <button type="button" id="toast-break-btn" class="btn btn--sm btn--primary">Pausa 20-20-20</button>
+          <button type="button" id="toast-close-btn" class="btn btn--icon btn--sm" aria-label="Cerrar aviso"><svg><use href="#i-x"/></svg></button>
+        </div>
+
+        <div id="break-overlay" class="break" hidden>
+          <div class="break__ring"><span id="break-count">20</span></div>
+          <h2>Mira algo a unos 6 metros</h2>
+          <p>Relaja la vista y parpadea con calma. La medición se pausa durante el descanso.</p>
+          <button type="button" id="break-skip-btn" class="btn btn--ghost">Terminar descanso</button>
+        </div>
+
+        <div id="game-overlay" class="game" hidden>
+          <canvas id="game-canvas" aria-label="Minijuego: el ojo salta cada vez que parpadeas"></canvas>
+
+          <div id="game-intro" class="game__panel card">
+            <span class="game__icon" aria-hidden="true"><svg><use href="#i-eye"/></svg></span>
+            <h2>Ojo saltarín: parpadea para saltar</h2>
+            <p class="muted">Cada vez que parpadeas, el ojo salta y parpadea contigo. Esquiva los obstáculos durante 1 minuto.</p>
+            <ul class="game__tips">
+              <li>Cierra los ojos <strong>por completo</strong> en cada parpadeo.</li>
+              <li>Los obstáculos llegan al ritmo natural de parpadeo (15–20 por minuto).</li>
+              <li>Chocar no termina el juego: solo relájate y sigue el ritmo.</li>
+            </ul>
+            <div class="game__actions">
+              <button type="button" id="game-cancel-btn" class="btn btn--ghost">Ahora no</button>
+              <button type="button" id="game-start-btn" class="btn btn--primary">Empezar</button>
+            </div>
+          </div>
+
+          <div id="game-hud" class="game__hud" hidden>
+            <span class="game__stat"><small>Tiempo</small><strong id="game-hud-time">60s</strong></span>
+            <span class="game__stat"><small>Esquivados</small><strong id="game-hud-cleared">0</strong></span>
+            <span class="game__stat game__stat--hits"><small>Choques</small><strong id="game-hud-hits">0</strong></span>
+            <span class="game__stat"><small>Parpadeos completos</small><strong id="game-hud-blinks">0/0</strong></span>
+            <button type="button" id="game-exit-btn" class="btn btn--ghost btn--sm">Salir</button>
+          </div>
+
+          <p id="game-hint" class="game__hint" role="status" hidden></p>
+
+          <div id="game-summary" class="game__panel card" hidden>
+            <span class="game__icon" aria-hidden="true"><svg><use href="#i-eye"/></svg></span>
+            <h2>¡Ejercicio terminado!</h2>
+            <div class="game__results">
+              <div><small>Esquivados</small><strong id="game-sum-cleared">–</strong></div>
+              <div><small>Ritmo de parpadeo</small><strong id="game-sum-rate">–</strong></div>
+              <div><small>Parpadeos completos</small><strong id="game-sum-complete">–</strong></div>
+            </div>
+            <p id="game-sum-message" class="muted"></p>
+            <div class="game__actions">
+              <button type="button" id="game-again-btn" class="btn btn--ghost">Jugar otra vez</button>
+              <button type="button" id="game-back-btn" class="btn btn--primary">Volver a la sesión</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="mon-side">
+        <div class="cam card">
+          <video id="webcam" autoplay playsinline muted></video>
+          <div id="cam-calibration" class="cam__overlay">
+            <p id="cam-calibration-text">Cargando detector facial…</p>
+            <div class="progress"><span id="cam-calibration-bar"></span></div>
+          </div>
+          <div id="cam-noface" class="cam__overlay cam__overlay--warn" hidden>
+            <p>No se detecta tu rostro</p>
+          </div>
+        </div>
+
+        <div id="metric-fatiga-card" class="level card">
+          <p class="level__label">Nivel de fatiga</p>
+          <p class="level__value" id="metric-fatiga">Esperando datos…</p>
+          <p class="level__hint muted small" id="metric-fatiga-hint">Se evalúa cada 15 s con la ventana del último minuto.</p>
+        </div>
+
+        <div class="metrics">
+          <div class="metric"><span class="metric__label">PERCLOS</span><span class="metric__value"><span id="metric-perclos">--</span><small>%</small></span></div>
+          <div class="metric"><span class="metric__label">Parpadeos</span><span class="metric__value"><span id="metric-parpadeo">--</span><small>/min</small></span></div>
+          <div class="metric"><span class="metric__label">Cierre medio</span><span class="metric__value"><span id="metric-cierre">--</span><small>ms</small></span></div>
+          <div class="metric"><span class="metric__label">Cierres &gt; 0,5 s</span><span class="metric__value"><span id="metric-prolongados">--</span></span></div>
+          <div class="metric"><span class="metric__label">EAR</span><span class="metric__value"><span id="metric-ear">--</span></span></div>
+          <div class="metric"><span class="metric__label">Mov. ocular</span><span class="metric__value"><span id="metric-velocidad">--</span></span></div>
+        </div>
+
+        <button type="button" id="side-game-btn" class="exercise card" disabled>
+          <span class="exercise__icon" aria-hidden="true"><svg><use href="#i-eye"/></svg></span>
+          <span><strong>Ejercicio de parpadeo</strong><small>Minijuego de 1 minuto</small></span>
+        </button>
+      </aside>
+    </section>
+
+    <!-- Paso 3: KSS final -->
+    <dialog id="finish-dialog" class="dialog">
+      <form method="dialog" id="finish-form" class="dialog__body" novalidate>
+        <h2>Antes de terminar…</h2>
+        <p class="muted">¿Qué tan somnoliento te sientes ahora? <small>(KSS)</small></p>
+        <div class="kss" id="kss-final" data-kss-name="kss_final"></div>
+        <p id="finish-error" class="notice notice--error" role="alert" hidden></p>
+        <div class="dialog__actions">
+          <button type="button" id="finish-cancel-btn" class="btn btn--ghost">Seguir monitoreando</button>
+          <button type="submit" id="finish-confirm-btn" class="btn btn--danger">Guardar y finalizar</button>
+        </div>
+      </form>
+    </dialog>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -438,6 +489,7 @@
   <script src="/static/js/api.js"></script>
   <script src="/static/js/views.js"></script>
   <script src="/static/js/monitoreo.js"></script>
+  <script src="/static/js/blink-game.js"></script>
   <script src="/static/js/dashboard.js"></script>
   <script src="/static/js/auth.js"></script>
 </body>

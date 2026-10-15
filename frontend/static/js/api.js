@@ -29,7 +29,9 @@ async function apiFetch(path, options = {}) {
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || `Error ${response.status}`);
+    const error = new Error(body.detail || `Error ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
 
   if (response.status === 204) return null;

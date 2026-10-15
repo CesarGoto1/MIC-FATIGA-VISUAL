@@ -13,6 +13,8 @@ function showTab(tab) {
   tabRegister.classList.toggle("is-active", !isLogin);
   tabLogin.setAttribute("aria-selected", String(isLogin));
   tabRegister.setAttribute("aria-selected", String(!isLogin));
+  tabLogin.tabIndex = isLogin ? 0 : -1;
+  tabRegister.tabIndex = isLogin ? -1 : 0;
   loginSection.hidden = !isLogin;
   registerSection.hidden = isLogin;
   authHeading.textContent = isLogin ? "Bienvenido de nuevo" : "Crea tu cuenta";
@@ -24,6 +26,16 @@ function showTab(tab) {
 
 tabLogin.addEventListener("click", () => showTab("login"));
 tabRegister.addEventListener("click", () => showTab("register"));
+
+[tabLogin, tabRegister].forEach((tab) => {
+  tab.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const next = tab === tabLogin ? tabRegister : tabLogin;
+    showTab(next === tabLogin ? "login" : "register");
+    next.focus();
+  });
+});
 
 document.querySelectorAll(".field__toggle").forEach((button) => {
   const input = document.getElementById(button.dataset.toggleFor);

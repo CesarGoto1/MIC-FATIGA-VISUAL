@@ -26,9 +26,6 @@ function showMonitoreoView() {
   if (typeof resetMonitoreo === "function") resetMonitoreo();
 }
 
-// ---------- Tema claro / oscuro ----------
-// Sin preferencia guardada se respeta la del sistema operativo.
-
 function readStoredTheme() {
   try {
     return localStorage.getItem("tema");
@@ -57,13 +54,10 @@ document.querySelectorAll(".theme-toggle").forEach((button) => {
     try {
       localStorage.setItem("tema", next);
     } catch {
-      /* sin almacenamiento: el cambio dura solo esta visita */
+
     }
   });
 });
-
-// ---------- Karolinska Sleepiness Scale ----------
-// Åkerstedt y Gillberg (1990). Las etiquetas pares son puntos intermedios.
 
 const KSS_ETIQUETAS = {
   1: "Extremadamente alerta",

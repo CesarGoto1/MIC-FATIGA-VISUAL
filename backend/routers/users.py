@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy import desc
 from sqlalchemy.orm import Session, selectinload
 
@@ -6,7 +6,7 @@ from backend.database import get_db
 from backend.dependencies import get_current_user_id
 from backend.models.orm import Sesion
 from backend.models.schemas import MedicionOut, SesionOut
-from backend.routers.sessions import MIN_MEDICIONES_PARA_ANALISIS
+from backend.routers.sessions import MIN_MEDICIONES_PARA_ANALISIS, cerrar_sesiones_abandonadas
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -18,13 +18,16 @@ def _estado_analisis(sesion: Sesion) -> str:
         return "sin_datos"
     if sesion.diagnosticos:
         return "no_disponible"
-    # Finalizada con datos y sin ningún intento registrado: la tarea aún está en curso.
     return "pendiente"
 
 
 @router.get("/me/history", response_model=list[SesionOut])
-def get_history(usuario_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)):
-    """Lista las sesiones del usuario junto con todas sus mediciones en una sola consulta."""
+def get_history(
+    background_tasks: BackgroundTasks,
+    usuario_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    cerrar_sesiones_abandonadas(db, usuario_id, background_tasks)
     sesiones = (
         db.query(Sesion)
         .filter(Sesion.usuario_id == usuario_id)
@@ -45,7 +48,9 @@ def get_history(usuario_id: int = Depends(get_current_user_id), db: Session = De
                 tiempo_cierre=m.tiempo_cierre,
                 velocidad_ocular=m.velocidad_ocular,
                 cierres_prolongados=m.cierres_prolongados,
+                parpadeos_incompletos_pct=m.parpadeos_incompletos_pct,
                 nivel_fatiga=m.nivel_fatiga,
+                somnolencia=m.somnolencia,
                 registrado_en=m.registrado_en.isoformat(),
             )
             for m in sorted(sesion.mediciones, key=lambda m: m.registrado_en)

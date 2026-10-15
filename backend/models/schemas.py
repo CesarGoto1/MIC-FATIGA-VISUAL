@@ -5,12 +5,8 @@ from pydantic import BaseModel, EmailStr, Field
 NivelFatiga = Literal["sin_fatiga", "leve", "moderada"]
 MomentoJornada = Literal["pre", "post"]
 Actividad = Literal["lectura", "video", "libre"]
-# disponible: hay análisis | pendiente: se está generando | no_disponible: el intento falló
-# (se puede reintentar) | sin_datos: la sesión no permite análisis (abierta o < 2 mediciones).
 EstadoAnalisis = Literal["disponible", "pendiente", "no_disponible", "sin_datos"]
 
-# Karolinska Sleepiness Scale (Åkerstedt y Gillberg 1990): 1 = extremadamente alerta,
-# 9 = muy somnoliento, luchando contra el sueño.
 KSS_MIN = 1
 KSS_MAX = 9
 
@@ -57,11 +53,18 @@ class MetricsInRequest(BaseModel):
     tiempo_cierre: float = Field(ge=0, description="Duración promedio de cierre ocular en ms")
     velocidad_ocular: float = Field(ge=0, description="Velocidad del iris en anchos de ojo por segundo")
     cierres_prolongados: int = Field(ge=0, description="Cierres de más de 500 ms en la ventana")
+    parpadeos_incompletos_pct: Optional[float] = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description="Porcentaje de parpadeos que no cierran el párpado al 80 % (nulo si no hubo parpadeos)",
+    )
 
 
 class MetricsSavedResponse(BaseModel):
     medicion_id: int
     nivel_fatiga: NivelFatiga
+    somnolencia: bool
 
 
 class MedicionOut(BaseModel):
@@ -73,7 +76,9 @@ class MedicionOut(BaseModel):
     tiempo_cierre: Optional[float]
     velocidad_ocular: Optional[float]
     cierres_prolongados: Optional[int]
+    parpadeos_incompletos_pct: Optional[float]
     nivel_fatiga: Optional[str]
+    somnolencia: Optional[bool]
     registrado_en: str
 
 

@@ -11,7 +11,6 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(data: RegisterRequest, db: Session = Depends(get_db)):
-    """Crea un usuario nuevo y devuelve su token de acceso."""
     existe = db.query(Usuario).filter(Usuario.email == data.email).first()
     if existe is not None:
         raise HTTPException(
@@ -33,7 +32,6 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokenResponse)
 def login(data: LoginRequest, db: Session = Depends(get_db)):
-    """Valida credenciales de un usuario existente y devuelve su token de acceso."""
     credenciales_invalidas = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Correo o contraseña incorrectos.",

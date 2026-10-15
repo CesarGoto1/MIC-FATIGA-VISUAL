@@ -1,45 +1,34 @@
-// Índices de MediaPipe Face Mesh (468 puntos + 10 de iris con refineLandmarks).
-// Orden EAR: p1 y p4 = comisuras; p2, p3 = párpado superior; p5, p6 = párpado inferior.
 const RIGHT_EYE = [33, 160, 158, 133, 153, 144];
 const LEFT_EYE = [362, 385, 387, 263, 373, 380];
 const RIGHT_IRIS_CENTER = 468;
 const LEFT_IRIS_CENTER = 473;
 
-// Calibración (EAR adaptativo, Gupta et al. 2023): la línea base es la mediana del EAR
-// con los ojos abiertos, robusta frente a los parpadeos que ocurran al calibrar.
 const CALIBRATION_MS = 5_000;
 const MIN_CALIBRATION_SAMPLES = 30;
 
-// Detección de parpadeo con histéresis: el ojo "se cierra" al bajar del 75 % de la línea
-// base y "se abre" al superar el 85 %, para que el ruido cerca del umbral no genere
-// parpadeos falsos. Los cierres se filtran por duración (Abdulkader et al. 2023).
 const BLINK_CLOSE_RATIO = 0.75;
 const BLINK_OPEN_RATIO = 0.85;
 const MIN_CLOSURE_MS = 50;
 const MAX_BLINK_MS = 500;
 
-// PERCLOS P80: fracción del tiempo con el párpado cerrado al 80 % o más. El EAR de un ojo
-// cerrado no llega a 0 con Face Mesh, así que la apertura se normaliza entre el "piso"
-// (mediana del EAR mínimo de los parpadeos recientes) y la línea base.
 const P80_OPENNESS = 0.2;
+const FULL_BLINKS_REQUIRED = 3;
+const MAX_VOLUNTARY_BLINK_MS = 1_500;
+const CLOSURE_CALIBRATION_TIMEOUT_MS = 20_000;
 const DEFAULT_FLOOR_RATIO = 0.4;
-const MIN_BLINKS_FOR_FLOOR = 3;
-const FLOOR_BLINK_SAMPLES = 20;
 
 const WINDOW_MS = 60_000;
 const MAX_FRAME_GAP_MS = 250;
 const FACE_LOST_MS = 1_500;
-const METRICS_SEND_INTERVAL_MS = 15_000;
+const METRICS_SEND_INTERVAL_MS = WINDOW_MS;
+const MAX_UNSENT_MS = 5 * WINDOW_MS;
 const MIN_OBSERVED_MS = 20_000;
 
 const DETECTOR_TIMEOUT_MS = 20_000;
 
 const BREAK_SECONDS = 20;
-// Mismo umbral que PARPADEOS_MIN_BAJO en backend/fatigue.py: decide qué ejercicio sugerir.
-const PARPADEOS_MIN_BAJO = 8;
 const ALERT_COOLDOWN_MS = 120_000;
 
-// ---------- Elementos ----------
 const setupSection = document.getElementById("mon-setup");
 const liveSection = document.getElementById("mon-live");
 const setupForm = document.getElementById("setup-form");
@@ -69,10 +58,7 @@ const toastEl = document.getElementById("toast");
 const breakOverlay = document.getElementById("break-overlay");
 const breakCount = document.getElementById("break-count");
 
-// ---------- Estado ----------
 let camera = null;
-// El detector se crea una sola vez por visita: la solución JS de MediaPipe puede quedar
-// colgada si se cierra y se vuelve a crear, así que se reutiliza entre sesiones.
 let faceMesh = null;
 let firstResultReceived = false;
 let detectorTimeoutHandle = null;
@@ -86,13 +72,13 @@ let startedAt = null;
 let baselineEar = null;
 let calibrationSamples = [];
 let calibrationStartedAt = null;
+let fullClosureEar = null;
+let closureCalibration = null;
 
-let samples = [];        // { t, dt, ear, p80 }
-let blinks = [];         // { t, trough }
-let closures = [];       // { t, duration }
-let longClosures = [];   // { t }
-let velocities = [];     // { t, speed }
-let recentTroughs = [];
+let samples = [];
+let blinks = [];
+let longClosures = [];
+let velocities = [];
 
 let eyeClosed = false;
 let closureStartedAt = null;
@@ -101,11 +87,10 @@ let lastSampleAt = null;
 let lastFaceAt = null;
 let lastIris = null;
 let paused = false;
-let eyeListener = null;  // recibe el EAR mientras hay un ejercicio activo (minijuego)
-let lastMetrics = null;
+let eyeListener = null;
+let lastSentAt = 0;
 let lastAlert = { nivel: null, dismissedAt: 0 };
 
-// ---------- Geometría ----------
 function distance(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
@@ -115,8 +100,6 @@ function eyeAspectRatio(landmarks, eyeIndices) {
   return (distance(p2, p6) + distance(p3, p5)) / (2 * distance(p1, p4));
 }
 
-// Posición del iris relativa a las comisuras del ojo, en anchos de ojo. Al ser relativa,
-// los desplazamientos de la cabeza no se confunden con movimiento ocular.
 function irisOffset(landmarks, eyeIndices, irisIndex) {
   const inner = landmarks[eyeIndices[0]];
   const outer = landmarks[eyeIndices[3]];
@@ -139,9 +122,7 @@ function averageOf(list, key) {
   return list.reduce((acc, item) => acc + item[key], 0) / list.length;
 }
 
-// ---------- Procesamiento por fotograma ----------
 function onFaceMeshResults(results) {
-  // Resultados rezagados de un fotograma enviado antes de cerrar la sesión.
   if (camera === null) return;
   if (!firstResultReceived) {
     firstResultReceived = true;
@@ -152,7 +133,6 @@ function onFaceMeshResults(results) {
   const landmarks = results.multiFaceLandmarks?.[0];
 
   if (!landmarks) {
-    // Sin rostro no se acumula tiempo observado: el siguiente fotograma empieza de cero.
     lastSampleAt = null;
     lastIris = null;
     if (lastFaceAt === null || now - lastFaceAt > FACE_LOST_MS) setFaceVisible(false);
@@ -161,15 +141,20 @@ function onFaceMeshResults(results) {
   lastFaceAt = now;
   setFaceVisible(true);
 
-  const ear = (eyeAspectRatio(landmarks, RIGHT_EYE) + eyeAspectRatio(landmarks, LEFT_EYE)) / 2;
+  const earRight = eyeAspectRatio(landmarks, RIGHT_EYE);
+  const earLeft = eyeAspectRatio(landmarks, LEFT_EYE);
+  const ear = (earRight + earLeft) / 2;
 
   if (baselineEar === null) {
     calibrate(ear, now);
     return;
   }
+  if (fullClosureEar === null) {
+    calibrateClosure(ear, now);
+    return;
+  }
   if (eyeListener) {
-    // Durante un ejercicio los parpadeos son voluntarios: van al ejercicio, no a las métricas.
-    eyeListener(ear, now);
+    eyeListener(Math.max(earRight, earLeft), now);
     return;
   }
   if (paused) {
@@ -183,14 +168,12 @@ function onFaceMeshResults(results) {
 
   detectBlink(ear, now);
 
-  const floor = closedEyeFloor();
-  const p80Threshold = floor + P80_OPENNESS * (baselineEar - floor);
-  samples.push({ t: now, dt, ear, p80: ear <= p80Threshold });
+  samples.push({ t: now, dt, ear, p80: ear <= p80Threshold() });
+  Charts.pushEar(now, ear);
 
   const offsetRight = irisOffset(landmarks, RIGHT_EYE, RIGHT_IRIS_CENTER);
   const offsetLeft = irisOffset(landmarks, LEFT_EYE, LEFT_IRIS_CENTER);
   const iris = { x: (offsetRight.x + offsetLeft.x) / 2, y: (offsetRight.y + offsetLeft.y) / 2 };
-  // Durante un cierre el iris no es visible y su posición estimada no es confiable.
   if (lastIris !== null && dt > 0 && !eyeClosed) {
     velocities.push({ t: now, speed: distance(iris, lastIris) / (dt / 1000) });
   }
@@ -205,17 +188,49 @@ function calibrate(ear, now) {
   calibrationSamples.push(ear);
 
   const progress = Math.min(1, (now - calibrationStartedAt) / CALIBRATION_MS);
-  calibrationBar.style.width = `${progress * 100}%`;
+  calibrationBar.style.transform = `scaleX(${progress})`;
 
   if (progress >= 1 && calibrationSamples.length >= MIN_CALIBRATION_SAMPLES) {
     baselineEar = median(calibrationSamples);
     console.info(`Línea base de EAR (mediana): ${baselineEar.toFixed(3)}`);
-    calibrationOverlay.hidden = true;
-    startedAt = Date.now();
-    startTimer();
-    document.getElementById("side-game-btn").disabled = false;
-    setStatus("running", "Monitoreando");
+    calibrationBar.style.transform = "scaleX(0)";
+    calibrationText.textContent = `Ahora parpadea ${FULL_BLINKS_REQUIRED} veces cerrando los ojos por completo, sin apretar.`;
   }
+}
+
+function calibrateClosure(ear, now) {
+  const c = (closureCalibration ??= { startedAt: now, closed: false, since: 0, trough: 0, troughs: [] });
+
+  if (!c.closed && ear < baselineEar * BLINK_CLOSE_RATIO) {
+    Object.assign(c, { closed: true, since: now, trough: ear });
+  } else if (c.closed) {
+    c.trough = Math.min(c.trough, ear);
+    if (ear > baselineEar * BLINK_OPEN_RATIO) {
+      c.closed = false;
+      const duration = now - c.since;
+      if (duration >= MIN_CLOSURE_MS && duration <= MAX_VOLUNTARY_BLINK_MS) c.troughs.push(c.trough);
+      calibrationBar.style.transform = `scaleX(${Math.min(1, c.troughs.length / FULL_BLINKS_REQUIRED)})`;
+    }
+  }
+
+  if (c.troughs.length >= FULL_BLINKS_REQUIRED) {
+    fullClosureEar = Math.min(median(c.troughs), baselineEar * (BLINK_CLOSE_RATIO - 0.15));
+    console.info(`EAR de cierre completo (mediana): ${fullClosureEar.toFixed(3)}`);
+    finishCalibration();
+  } else if (now - c.startedAt > CLOSURE_CALIBRATION_TIMEOUT_MS) {
+    fullClosureEar = baselineEar * DEFAULT_FLOOR_RATIO;
+    console.warn("No se detectaron los parpadeos de calibración; se usa el piso de respaldo.");
+    finishCalibration();
+  }
+}
+
+function finishCalibration() {
+  calibrationOverlay.hidden = true;
+  Charts.startLive({ blinkThreshold: baselineEar * BLINK_CLOSE_RATIO, p80Threshold: p80Threshold() });
+  startedAt = Date.now();
+  startTimer();
+  document.getElementById("side-game-btn").disabled = false;
+  setStatus("running", "Monitoreando");
 }
 
 function detectBlink(ear, now) {
@@ -232,30 +247,28 @@ function detectBlink(ear, now) {
 
   eyeClosed = false;
   const duration = now - closureStartedAt;
-  if (duration < MIN_CLOSURE_MS) return; // ruido de un solo fotograma
+  if (duration < MIN_CLOSURE_MS) return;
 
-  closures.push({ t: now, duration });
   if (duration <= MAX_BLINK_MS) {
-    blinks.push({ t: now, trough: closureTrough });
-    recentTroughs.push(closureTrough);
-    if (recentTroughs.length > FLOOR_BLINK_SAMPLES) recentTroughs.shift();
+    blinks.push({ t: now, duration, complete: closureTrough <= p80Threshold() });
   } else {
     longClosures.push({ t: now });
   }
 }
 
 function closedEyeFloor() {
-  const fallback = baselineEar * DEFAULT_FLOOR_RATIO;
-  if (recentTroughs.length < MIN_BLINKS_FOR_FLOOR) return fallback;
-  // El piso nunca puede quedar por encima del umbral de cierre del parpadeo.
-  return Math.min(median(recentTroughs), baselineEar * (BLINK_CLOSE_RATIO - 0.15));
+  return fullClosureEar ?? baselineEar * DEFAULT_FLOOR_RATIO;
+}
+
+function p80Threshold() {
+  const floor = closedEyeFloor();
+  return floor + P80_OPENNESS * (baselineEar - floor);
 }
 
 function pruneWindow(now) {
-  const cutoff = now - WINDOW_MS;
+  const cutoff = Math.max(Math.min(now - WINDOW_MS, lastSentAt), now - MAX_UNSENT_MS);
   samples = samples.filter((s) => s.t >= cutoff);
   blinks = blinks.filter((b) => b.t >= cutoff);
-  closures = closures.filter((c) => c.t >= cutoff);
   longClosures = longClosures.filter((c) => c.t >= cutoff);
   velocities = velocities.filter((v) => v.t >= cutoff);
 }
@@ -263,7 +276,6 @@ function pruneWindow(now) {
 function resetWindow() {
   samples = [];
   blinks = [];
-  closures = [];
   longClosures = [];
   velocities = [];
   eyeClosed = false;
@@ -271,29 +283,35 @@ function resetWindow() {
   lastIris = null;
 }
 
-// ---------- Métricas de la ventana ----------
-function computeMetrics() {
-  const observedMs = samples.reduce((acc, s) => acc + s.dt, 0);
+function computeMetrics(desde = -Infinity) {
+  const posterior = (item) => item.t > desde;
+  const ventana = samples.filter(posterior);
+  const observedMs = ventana.reduce((acc, s) => acc + s.dt, 0);
   if (observedMs === 0) return null;
 
-  const closedMs = samples.reduce((acc, s) => acc + (s.p80 ? s.dt : 0), 0);
+  const closedMs = ventana.reduce((acc, s) => acc + (s.p80 ? s.dt : 0), 0);
+  const parpadeos = blinks.filter(posterior);
+  const incompletos = parpadeos.filter((b) => !b.complete).length;
   return {
     observedMs,
-    ear: averageOf(samples, "ear"),
+    ear: averageOf(ventana, "ear"),
     perclos: (closedMs / observedMs) * 100,
-    parpadeos_min: blinks.length / (observedMs / 60_000),
-    tiempo_cierre: averageOf(closures, "duration"),
-    velocidad_ocular: averageOf(velocities, "speed"),
-    cierres_prolongados: longClosures.length,
+    parpadeos_min: parpadeos.length / (observedMs / 60_000),
+    parpadeos_incompletos_pct: parpadeos.length ? (incompletos / parpadeos.length) * 100 : null,
+    tiempo_cierre: averageOf(parpadeos, "duration"),
+    velocidad_ocular: averageOf(velocities.filter(posterior), "speed"),
+    cierres_prolongados: longClosures.filter(posterior).length,
   };
 }
 
 function updateLiveMetrics(currentEar) {
   document.getElementById("metric-ear").textContent = currentEar.toFixed(3);
-  const m = computeMetrics();
+  const m = computeMetrics(performance.now() - WINDOW_MS);
   if (!m) return;
   document.getElementById("metric-perclos").textContent = m.perclos.toFixed(1);
   document.getElementById("metric-parpadeo").textContent = m.parpadeos_min.toFixed(1);
+  document.getElementById("metric-incompletos").textContent =
+    m.parpadeos_incompletos_pct === null ? "--" : m.parpadeos_incompletos_pct.toFixed(0);
   document.getElementById("metric-cierre").textContent = m.tiempo_cierre.toFixed(0);
   document.getElementById("metric-prolongados").textContent = m.cierres_prolongados;
   document.getElementById("metric-velocidad").textContent = m.velocidad_ocular.toFixed(2);
@@ -301,7 +319,8 @@ function updateLiveMetrics(currentEar) {
 
 async function sendMetrics() {
   if (sesionId === null || paused) return;
-  const m = computeMetrics();
+  const corte = performance.now();
+  const m = computeMetrics(lastSentAt);
   if (!m || m.observedMs < MIN_OBSERVED_MS) return;
 
   try {
@@ -314,21 +333,34 @@ async function sendMetrics() {
         tiempo_cierre: m.tiempo_cierre,
         velocidad_ocular: m.velocidad_ocular,
         cierres_prolongados: m.cierres_prolongados,
+        parpadeos_incompletos_pct: m.parpadeos_incompletos_pct,
       }),
     });
-    lastMetrics = m;
+    lastSentAt = corte;
+    Charts.pushMinute(m);
     showFatigueLevel(result.nivel_fatiga);
-    maybeAlert(result.nivel_fatiga);
+    maybeAlert(result.somnolencia ? "somnolencia" : result.nivel_fatiga);
   } catch (err) {
+    if (err.status === 409) {
+      sesionClosedByServer();
+      return;
+    }
     console.error("No se pudo guardar la medición:", err.message);
   }
 }
 
-// ---------- Interfaz ----------
+function sesionClosedByServer() {
+  sesionId = null;
+  if (finishDialog.open) finishDialog.close();
+  releaseResources();
+  showDashboardView();
+  alert("La sesión se cerró automáticamente por inactividad. Puedes iniciar una nueva.");
+}
+
 const NIVEL_HINT = {
   sin_fatiga: "Tus indicadores están en rango normal.",
-  leve: "Parpadeas poco o tus ojos se cierran más de lo habitual.",
-  moderada: "Tus ojos muestran signos claros de cansancio.",
+  leve: "Parpadeas poco o muchos de tus parpadeos no cierran del todo.",
+  moderada: "Parpadeas poco y muchos de tus parpadeos no cierran del todo.",
 };
 
 function setStatus(kind, text) {
@@ -337,7 +369,7 @@ function setStatus(kind, text) {
 }
 
 function setFaceVisible(visible) {
-  if (noFaceOverlay.hidden === visible) return; // sin cambios: evita tocar el DOM en cada fotograma
+  if (noFaceOverlay.hidden === visible) return;
   noFaceOverlay.hidden = visible;
   if (baselineEar === null || paused) return;
   setStatus(visible ? "running" : "warn", visible ? "Monitoreando" : "Sin rostro");
@@ -359,6 +391,10 @@ const MENSAJES_ALERTA = {
     titulo: "Fatiga visual moderada",
     texto: "Te recomendamos detenerte y descansar la vista unos segundos.",
   },
+  somnolencia: {
+    titulo: "Signos de somnolencia",
+    texto: "Tus ojos se cierran por momentos largos. Si tienes sueño, conviene descansar antes de seguir.",
+  },
 };
 
 function maybeAlert(nivel) {
@@ -367,7 +403,6 @@ function maybeAlert(nivel) {
     hideToast();
     return;
   }
-  // No se repite el mismo aviso inmediatamente después de cerrarlo (evita saturar al usuario).
   const reciente = Date.now() - lastAlert.dismissedAt < ALERT_COOLDOWN_MS;
   if (reciente && lastAlert.nivel === nivel) return;
 
@@ -375,9 +410,7 @@ function maybeAlert(nivel) {
   document.getElementById("toast-title").textContent = mensaje.titulo;
   document.getElementById("toast-text").textContent = mensaje.texto;
   toastEl.dataset.nivel = nivel;
-  // Parpadeo bajo -> ejercicio de parpadeo. PERCLOS alto indica somnolencia: ahí se
-  // sugiere descansar, no un ejercicio.
-  const sugerirJuego = lastMetrics !== null && lastMetrics.parpadeos_min < PARPADEOS_MIN_BAJO && nivel === "leve";
+  const sugerirJuego = nivel === "leve";
   document.getElementById("toast-game-btn").hidden = !sugerirJuego;
   document.getElementById("toast-break-btn").hidden = sugerirJuego;
   toastEl.hidden = false;
@@ -400,7 +433,7 @@ function startGame() {
 
 function endGame() {
   eyeListener = null;
-  if (sesionId === null) return; // la sesión se cerró mientras el juego estaba abierto
+  if (sesionId === null) return;
   resetWindow();
   paused = false;
   setStatus("running", "Monitoreando");
@@ -427,7 +460,6 @@ function endBreak() {
   clearInterval(breakHandle);
   breakHandle = null;
   breakOverlay.hidden = true;
-  // Se reinicia la ventana para que las mediciones posteriores reflejen el estado tras la pausa.
   resetWindow();
   paused = false;
   setStatus("running", "Monitoreando");
@@ -452,7 +484,6 @@ function showContent(actividad, file) {
     viewerEmpty.hidden = false;
     return;
   }
-  // El archivo se abre desde memoria local (blob:), nunca se sube al servidor.
   contentUrl = URL.createObjectURL(file);
   if (actividad === "lectura") {
     viewerPdf.src = contentUrl;
@@ -463,7 +494,6 @@ function showContent(actividad, file) {
   }
 }
 
-// ---------- Preparación ----------
 const ACCEPT_BY_ACTIVIDAD = { lectura: "application/pdf", video: "video/*" };
 
 setupForm.addEventListener("change", (e) => {
@@ -515,19 +545,20 @@ async function startMonitoring(setup) {
   baselineEar = null;
   calibrationSamples = [];
   calibrationStartedAt = null;
-  recentTroughs = [];
+  fullClosureEar = null;
+  closureCalibration = null;
   lastFaceAt = null;
   paused = false;
   lastAlert = { nivel: null, dismissedAt: 0 };
-  lastMetrics = null;
+  lastSentAt = 0;
   resetWindow();
 
   document.getElementById("metric-fatiga-card").dataset.nivel = "";
   document.getElementById("metric-fatiga").textContent = "Esperando datos…";
-  document.getElementById("metric-fatiga-hint").textContent = "Se evalúa cada 15 s con la ventana del último minuto.";
-  ["metric-perclos", "metric-parpadeo", "metric-cierre", "metric-prolongados", "metric-ear", "metric-velocidad"]
+  document.getElementById("metric-fatiga-hint").textContent = "Se evalúa cada minuto con lo ocurrido en ese minuto.";
+  ["metric-perclos", "metric-parpadeo", "metric-incompletos", "metric-cierre", "metric-prolongados", "metric-ear", "metric-velocidad"]
     .forEach((id) => (document.getElementById(id).textContent = "--"));
-  calibrationBar.style.width = "0%";
+  calibrationBar.style.transform = "scaleX(0)";
   calibrationOverlay.hidden = false;
   noFaceOverlay.hidden = true;
 
@@ -581,6 +612,7 @@ function releaseResources() {
   breakOverlay.hidden = true;
   hideToast();
   BlinkGame.close();
+  Charts.stopLive();
   eyeListener = null;
   document.getElementById("side-game-btn").disabled = true;
 
@@ -599,16 +631,23 @@ function releaseResources() {
 
 async function finishMonitoring(kssFinal) {
   await sendMetrics();
-  await apiFetch(`/sessions/${sesionId}/finish`, {
-    method: "PUT",
-    body: JSON.stringify({ kss_final: kssFinal }),
-  });
+  if (sesionId === null) return;
+  try {
+    await apiFetch(`/sessions/${sesionId}/finish`, {
+      method: "PUT",
+      body: JSON.stringify({ kss_final: kssFinal }),
+    });
+  } catch (err) {
+    if (err.status !== 409) throw err;
+    sesionClosedByServer();
+    return;
+  }
+  abrirResumenAlVolver(sesionId);
   sesionId = null;
   releaseResources();
   showDashboardView();
 }
 
-// ---------- Eventos ----------
 setupForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const setup = readSetup();
@@ -623,6 +662,7 @@ setupForm.addEventListener("submit", async (e) => {
     await startMonitoring(setup);
   } catch (err) {
     console.error(err);
+    sesionId = null;
     releaseResources();
     resetMonitoreo();
     setupError.textContent = `No se pudo iniciar el monitoreo: ${err.message}`;
@@ -673,7 +713,6 @@ document.getElementById("side-game-btn").addEventListener("click", startGame);
 document.getElementById("break-skip-btn").addEventListener("click", endBreak);
 
 document.getElementById("mon-back-btn").addEventListener("click", () => {
-  // Una sesión en curso se cierra con la KSS final; si aún no empezó, se vuelve directo.
   if (sesionId !== null) askToFinish();
   else showDashboardView();
 });

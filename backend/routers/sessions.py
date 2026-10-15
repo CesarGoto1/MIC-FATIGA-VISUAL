@@ -1,4 +1,5 @@
 import math
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import asc, desc, func
@@ -7,7 +8,7 @@ from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.dependencies import get_current_user_id
 from backend.diagnosis import generar_diagnostico
-from backend.fatigue import clasificar_fatiga
+from backend.fatigue import clasificar_fatiga, clasificar_tramo, detectar_somnolencia
 from backend.models.orm import Diagnostico, Medicion, Sesion
 from backend.models.schemas import (
     DiagnosticoOut,
@@ -21,11 +22,18 @@ from backend.models.schemas import (
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 MIN_MEDICIONES_PARA_ANALISIS = 2
-METRICAS_ANALISIS = ("perclos", "parpadeos_min", "tiempo_cierre", "velocidad_ocular", "cierres_prolongados")
+INACTIVIDAD_MAXIMA = timedelta(minutes=15)
+METRICAS_ANALISIS = (
+    "parpadeos_min",
+    "parpadeos_incompletos_pct",
+    "tiempo_cierre",
+    "velocidad_ocular",
+    "perclos",
+    "cierres_prolongados",
+)
 
 
 def _obtener_sesion_del_usuario(db: Session, sesion_id: int, usuario_id: int) -> Sesion:
-    """Busca una sesión propia del usuario o lanza 404 si no existe."""
     sesion = (
         db.query(Sesion)
         .filter(Sesion.id == sesion_id, Sesion.usuario_id == usuario_id)
@@ -47,13 +55,40 @@ def _exigir_sesion_abierta(sesion: Sesion) -> None:
         )
 
 
+def cerrar_sesiones_abandonadas(
+    db: Session, usuario_id: int, background_tasks: BackgroundTasks
+) -> None:
+    limite = datetime.now(timezone.utc) - INACTIVIDAD_MAXIMA
+    abiertas = (
+        db.query(Sesion)
+        .filter(Sesion.usuario_id == usuario_id, Sesion.finalizada_en.is_(None))
+        .all()
+    )
+    for sesion in abiertas:
+        ultima_medicion = (
+            db.query(func.max(Medicion.registrado_en))
+            .filter(Medicion.sesion_id == sesion.id)
+            .scalar()
+        )
+        if (ultima_medicion or sesion.iniciada_en) >= limite:
+            continue
+        if ultima_medicion is None:
+            db.delete(sesion)
+            continue
+        sesion.finalizada_en = ultima_medicion
+        db.flush()
+        _programar_analisis(db, sesion, background_tasks)
+    db.flush()
+
+
 @router.post("", response_model=SessionCreateResponse, status_code=status.HTTP_201_CREATED)
 def create_session(
     data: SessionCreateRequest,
+    background_tasks: BackgroundTasks,
     usuario_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
-    """Inserta un registro nuevo en sesiones para el usuario autenticado."""
+    cerrar_sesiones_abandonadas(db, usuario_id, background_tasks)
     sesion = Sesion(
         usuario_id=usuario_id,
         actividad=data.actividad,
@@ -78,11 +113,11 @@ def save_metrics(
     usuario_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
-    """Inserta un registro nuevo en mediciones asociado a una sesión abierta."""
     sesion = _obtener_sesion_del_usuario(db, sesion_id, usuario_id)
     _exigir_sesion_abierta(sesion)
 
-    nivel_fatiga = clasificar_fatiga(data.perclos, data.parpadeos_min)
+    nivel_fatiga = clasificar_fatiga(data.parpadeos_min, data.parpadeos_incompletos_pct)
+    somnolencia = detectar_somnolencia(data.perclos, data.cierres_prolongados)
 
     medicion = Medicion(
         sesion_id=sesion_id,
@@ -93,12 +128,16 @@ def save_metrics(
         tiempo_cierre=data.tiempo_cierre,
         velocidad_ocular=data.velocidad_ocular,
         cierres_prolongados=data.cierres_prolongados,
+        parpadeos_incompletos_pct=data.parpadeos_incompletos_pct,
         nivel_fatiga=nivel_fatiga,
+        somnolencia=somnolencia,
     )
     db.add(medicion)
     db.flush()
 
-    return MetricsSavedResponse(medicion_id=medicion.id, nivel_fatiga=nivel_fatiga)
+    return MetricsSavedResponse(
+        medicion_id=medicion.id, nivel_fatiga=nivel_fatiga, somnolencia=somnolencia
+    )
 
 
 @router.get("/{sesion_id}/diagnosis", response_model=DiagnosticoOut)
@@ -107,7 +146,6 @@ def get_diagnosis(
     usuario_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
-    """Consulta el análisis interpretativo más reciente generado para una sesión."""
     _obtener_sesion_del_usuario(db, sesion_id, usuario_id)
 
     diagnostico = (
@@ -129,7 +167,6 @@ def get_diagnosis(
 
 
 def _promedio_tramo(mediciones: list[Medicion]) -> dict:
-    """Promedia cada métrica en un tramo de mediciones, ignorando valores nulos."""
     resultado = {}
     for clave in METRICAS_ANALISIS:
         valores = [float(getattr(m, clave)) for m in mediciones if getattr(m, clave) is not None]
@@ -138,16 +175,12 @@ def _promedio_tramo(mediciones: list[Medicion]) -> dict:
 
 
 def construir_payload_analisis(sesion: Sesion, mediciones: list[Medicion]) -> dict:
-    """Arma el payload para n8n comparando el primer y el último cuarto de la sesión.
-
-    Solo contiene métricas numéricas agregadas y el contexto de la sesión: ningún
-    identificador del usuario sale hacia el servicio de IA (privacidad por diseño).
-    """
     tramo = max(1, math.ceil(len(mediciones) / 4))
     duracion_min = None
     if sesion.finalizada_en is not None and sesion.iniciada_en is not None:
         duracion_min = round((sesion.finalizada_en - sesion.iniciada_en).total_seconds() / 60, 1)
 
+    tramo_final = _promedio_tramo(mediciones[-tramo:])
     return {
         "sesion": {
             "actividad": sesion.actividad,
@@ -157,7 +190,14 @@ def construir_payload_analisis(sesion: Sesion, mediciones: list[Medicion]) -> di
         },
         "kss": {"inicial": sesion.kss_inicial, "final": sesion.kss_final},
         "tramo_inicial": _promedio_tramo(mediciones[:tramo]),
-        "tramo_final": _promedio_tramo(mediciones[-tramo:]),
+        "tramo_final": tramo_final,
+        "nivel_fatiga_sistema": clasificar_tramo(tramo_final),
+        "control_somnolencia": {
+            "mediciones_con_somnolencia": sum(1 for m in mediciones if m.somnolencia),
+            "tramo_final": detectar_somnolencia(
+                tramo_final["perclos"], tramo_final["cierres_prolongados"]
+            ),
+        },
     }
 
 
@@ -169,7 +209,6 @@ def finish_session(
     usuario_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
-    """Cierra la sesión, registra la KSS final y agenda el análisis interpretativo."""
     sesion = _obtener_sesion_del_usuario(db, sesion_id, usuario_id)
     _exigir_sesion_abierta(sesion)
 
@@ -182,7 +221,6 @@ def finish_session(
 
 
 def _programar_analisis(db: Session, sesion: Sesion, background_tasks: BackgroundTasks) -> bool:
-    """Agenda el análisis en segundo plano si la sesión tiene datos suficientes."""
     mediciones = (
         db.query(Medicion)
         .filter(Medicion.sesion_id == sesion.id)
@@ -205,7 +243,6 @@ def retry_diagnosis(
     usuario_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
-    """Vuelve a solicitar el análisis de una sesión finalizada cuyo intento anterior falló."""
     sesion = _obtener_sesion_del_usuario(db, sesion_id, usuario_id)
     if sesion.finalizada_en is None:
         raise HTTPException(

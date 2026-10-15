@@ -11,7 +11,6 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 
 
 def get_db() -> Generator[Session, None, None]:
-    """Entrega una sesión de SQLAlchemy por request y la cierra al terminar."""
     db = SessionLocal()
     try:
         yield db

@@ -1,25 +1,35 @@
-"""Clasificación del nivel de fatiga visual a partir de métricas oculares agregadas.
-
-Los umbrales son reglas explícitas y trazables (no un modelo entrenado), de modo que
-cada decisión del sistema pueda justificarse con la literatura revisada en el OE1.
-Cualquier cambio de umbral debe reflejarse en la tabla de criterios de la tesis.
-"""
-
 from backend.models.schemas import NivelFatiga
 
-# PERCLOS P80: porcentaje del tiempo con el párpado cerrado al 80 % o más.
-# Referencia de uso habitual: Dinges y Grace (1998), FHWA-MCRT-98-006.
-PERCLOS_LEVE = 15.0
-PERCLOS_MODERADA = 30.0
-
-# Frecuencia de parpadeo espontáneo (SEBR). En reposo ronda 15-20 parpadeos/min y
-# frente a pantallas cae hasta un tercio (Tsubota y Nakamori 1993; Chidi-Egboka et al. 2023).
 PARPADEOS_MIN_BAJO = 8.0
+INCOMPLETOS_PCT_ALTO = 40.0
+
+PERCLOS_SOMNOLENCIA = 15.0
+CIERRES_PROLONGADOS_SOMNOLENCIA = 2
+
+NIVEL_ETIQUETA: dict[NivelFatiga, str] = {
+    "sin_fatiga": "Sin fatiga",
+    "leve": "Leve",
+    "moderada": "Moderada",
+}
 
 
-def clasificar_fatiga(perclos: float, parpadeos_min: float) -> NivelFatiga:
-    if perclos >= PERCLOS_MODERADA:
-        return "moderada"
-    if perclos >= PERCLOS_LEVE or parpadeos_min < PARPADEOS_MIN_BAJO:
-        return "leve"
-    return "sin_fatiga"
+def clasificar_fatiga(parpadeos_min: float, parpadeos_incompletos_pct: float | None) -> NivelFatiga:
+    signos = 0
+    if parpadeos_min < PARPADEOS_MIN_BAJO:
+        signos += 1
+    if parpadeos_incompletos_pct is not None and parpadeos_incompletos_pct >= INCOMPLETOS_PCT_ALTO:
+        signos += 1
+    return ("sin_fatiga", "leve", "moderada")[signos]
+
+
+def detectar_somnolencia(perclos: float | None, cierres_prolongados: float | None) -> bool:
+    return (perclos or 0) >= PERCLOS_SOMNOLENCIA or (
+        cierres_prolongados or 0
+    ) >= CIERRES_PROLONGADOS_SOMNOLENCIA
+
+
+def clasificar_tramo(promedios: dict) -> NivelFatiga | None:
+    parpadeos_min = promedios.get("parpadeos_min")
+    if parpadeos_min is None:
+        return None
+    return clasificar_fatiga(parpadeos_min, promedios.get("parpadeos_incompletos_pct"))

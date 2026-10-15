@@ -15,6 +15,7 @@ METRICAS_BASE = {
     "tiempo_cierre": 150.0,
     "velocidad_ocular": 0.4,
     "cierres_prolongados": 0,
+    "parpadeos_incompletos_pct": 10.0,
 }
 
 
@@ -64,7 +65,6 @@ def test_flujo_completo_de_sesion(monkeypatch):
     finish = client.put(f"/sessions/{sesion_id}/finish", json={"kss_final": 6}, headers=headers)
     assert finish.status_code == 204
 
-    # El payload hacia la IA debe ser serializable a JSON y no incluir datos del usuario.
     assert len(payloads) == 1
     serializado = json.dumps(payloads[0])
     assert "usuario" not in serializado
@@ -72,6 +72,8 @@ def test_flujo_completo_de_sesion(monkeypatch):
     assert payloads[0]["tramo_inicial"]["perclos"] == 3.0
     assert payloads[0]["tramo_final"]["perclos"] == 20.0
     assert payloads[0]["sesion"]["actividad"] == "video"
+    assert payloads[0]["nivel_fatiga_sistema"] == "leve"
+    assert payloads[0]["control_somnolencia"] == {"mediciones_con_somnolencia": 2, "tramo_final": True}
 
     historial = client.get("/users/me/history", headers=headers).json()
     assert historial[0]["kss_inicial"] == 2
@@ -184,3 +186,52 @@ def test_reintento_rechazado_cuando_no_corresponde(monkeypatch):
 
     ajena = _sesion_finalizada_con_mediciones(headers)
     assert client.post(f"/sessions/{ajena}/diagnosis/retry", headers=_headers()).status_code == 404
+
+
+def _envejecer_sesion(sesion_id: int, minutos: int) -> None:
+    from datetime import timedelta
+
+    from backend.database import SessionLocal
+    from backend.models.orm import Medicion, Sesion
+
+    db = SessionLocal()
+    try:
+        desfase = timedelta(minutes=minutos)
+        sesion = db.get(Sesion, sesion_id)
+        sesion.iniciada_en = sesion.iniciada_en - desfase
+        for medicion in db.query(Medicion).filter(Medicion.sesion_id == sesion_id):
+            medicion.registrado_en = medicion.registrado_en - desfase
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_sesiones_abandonadas_se_cierran_o_descartan(monkeypatch):
+    payloads = []
+
+    async def falso_diagnostico(sesion_id, payload):
+        payloads.append((sesion_id, payload))
+
+    monkeypatch.setattr(sessions_router, "generar_diagnostico", falso_diagnostico)
+    headers = _headers()
+
+    vacia = _crear_sesion(headers)
+    con_datos = _crear_sesion(headers)
+    for _ in range(2):
+        client.post(f"/sessions/{con_datos}/metrics", json=METRICAS_BASE, headers=headers)
+    reciente = _crear_sesion(headers)
+
+    minutos = int(sessions_router.INACTIVIDAD_MAXIMA.total_seconds() // 60) + 5
+    _envejecer_sesion(vacia, minutos)
+    _envejecer_sesion(con_datos, minutos)
+
+    historial = {s["id"]: s for s in client.get("/users/me/history", headers=headers).json()}
+
+    assert vacia not in historial
+    assert historial[con_datos]["finalizada_en"] is not None
+    assert historial[con_datos]["kss_final"] is None
+    assert [sesion_id for sesion_id, _ in payloads] == [con_datos]
+    assert historial[reciente]["finalizada_en"] is None
+
+    response = client.post(f"/sessions/{con_datos}/metrics", json=METRICAS_BASE, headers=headers)
+    assert response.status_code == 409

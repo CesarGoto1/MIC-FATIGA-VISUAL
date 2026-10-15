@@ -20,7 +20,6 @@ class Base(DeclarativeBase):
 
 
 class Usuario(Base):
-    """Modela la tabla usuarios: cuentas registradas en la plataforma."""
 
     __tablename__ = "usuarios"
 
@@ -36,7 +35,6 @@ class Usuario(Base):
 
 
 class Sesion(Base):
-    """Modela la tabla sesiones: una sesión de monitoreo iniciada por un usuario."""
 
     __tablename__ = "sesiones"
     __table_args__ = (
@@ -67,7 +65,6 @@ class Sesion(Base):
 
 
 class Medicion(Base):
-    """Modela la tabla mediciones: una lectura de métricas oculares dentro de una sesión."""
 
     __tablename__ = "mediciones"
     __table_args__ = (Index("idx_mediciones_sesion", "sesion_id"),)
@@ -77,21 +74,21 @@ class Medicion(Base):
         ForeignKey("sesiones.id", ondelete="CASCADE"), nullable=False
     )
     actividad: Mapped[str] = mapped_column(String(80), nullable=False)
-    # asdecimal=False: se leen como float y se pueden serializar a JSON sin conversión.
     ear: Mapped[float | None] = mapped_column(Numeric(5, 3, asdecimal=False))
     perclos: Mapped[float | None] = mapped_column(Numeric(5, 2, asdecimal=False))
     parpadeos_min: Mapped[float | None] = mapped_column(Numeric(5, 2, asdecimal=False))
     tiempo_cierre: Mapped[float | None] = mapped_column(Numeric(7, 1, asdecimal=False))
     velocidad_ocular: Mapped[float | None] = mapped_column(Numeric(8, 5, asdecimal=False))
     cierres_prolongados: Mapped[int | None] = mapped_column(SmallInteger)
+    parpadeos_incompletos_pct: Mapped[float | None] = mapped_column(Numeric(5, 2, asdecimal=False))
     nivel_fatiga: Mapped[str | None] = mapped_column(String(20))
+    somnolencia: Mapped[bool | None] = mapped_column()
     registrado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     sesion: Mapped["Sesion"] = relationship(back_populates="mediciones")
 
 
 class Diagnostico(Base):
-    """Modela la tabla diagnosticos: el diagnóstico narrativo generado para una sesión."""
 
     __tablename__ = "diagnosticos"
     __table_args__ = (Index("idx_diagnosticos_sesion", "sesion_id"),)

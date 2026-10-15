@@ -1,19 +1,8 @@
-"""KSS por sesión y cierres prolongados por medición
-
-Reemplaza la autoevaluación 1-5 que se repetía en cada medición por la
-Karolinska Sleepiness Scale (1-9) registrada al inicio y al final de la sesión.
-
-Revision ID: c7a1e2f3d4b5
-Revises: b4dfa1dfebf8
-Create Date: 2026-09-25 10:00:00.000000
-
-"""
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
 
-# revision identifiers, used by Alembic.
 revision: str = 'c7a1e2f3d4b5'
 down_revision: Union[str, None] = 'b4dfa1dfebf8'
 branch_labels: Union[str, Sequence[str], None] = None

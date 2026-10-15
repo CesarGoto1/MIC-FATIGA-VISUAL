@@ -1,24 +1,14 @@
-// Minijuego "Ojo saltarín": un ojo con patas salta cada vez que el usuario parpadea y
-// además cierra su párpado a la vez que él, como retroalimentación inmediata de que la
-// cámara está detectando el parpadeo.
-//
-// Objetivo preventivo: convertir el parpadeo completo en un hábito mediante gamificación.
-// Los obstáculos aparecen al ritmo del parpadeo espontáneo en reposo (15-20/min), de modo
-// que jugar equivale a practicar esa frecuencia. No hay "game over": chocar solo resta,
-// para que el ejercicio no genere estrés ni carga visual adicional.
-//
-// Depende de monitoreo.js: baselineEar, closedEyeFloor() y las constantes de parpadeo.
-
 const BlinkGame = (() => {
   const DURATION_MS = 60_000;
-  const MIN_GAP_MS = 2_600; // 23 obstáculos/min como máximo
-  const MAX_GAP_MS = 4_000; // 15 obstáculos/min como mínimo
-  const TRAVEL_MS = 2_400;  // tiempo que tarda un obstáculo en cruzar hasta la gota
-  const AIRTIME_MS = 950;   // mayor que un parpadeo, para ver el salto al reabrir los ojos
+  const MIN_GAP_MS = 2_600;
+  const MAX_GAP_MS = 4_000;
+  const TRAVEL_MS = 2_400;
+  const AIRTIME_MS = 950;
   const COUNTDOWN_MS = 3_000;
   const HIT_FLASH_MS = 700;
   const HINT_MS = 1_800;
   const MAX_FRAME_MS = 50;
+  const JUMP_OPENNESS = 0.5;
 
   const overlay = document.getElementById("game-overlay");
   const canvas = document.getElementById("game-canvas");
@@ -28,7 +18,7 @@ const BlinkGame = (() => {
   const summaryEl = document.getElementById("game-summary");
   const hintEl = document.getElementById("game-hint");
 
-  let phase = "closed"; // closed | intro | countdown | running | summary
+  let phase = "closed";
   let onExit = null;
   let rafHandle = null;
   let colors = {};
@@ -36,20 +26,18 @@ const BlinkGame = (() => {
 
   let phaseStartedAt = 0;
   let lastFrameAt = 0;
-  let gameClock = 0;       // tiempo de juego (ms), avanza con el dt limitado de cada fotograma
-  let nextObstacleAt = 0;  // en tiempo de juego: con FPS bajos los obstáculos no se amontonan
+  let gameClock = 0;
+  let nextObstacleAt = 0;
   let obstacles = [];
   let jumpStartedAt = null;
   let hitAt = null;
   let hintTimer = null;
   let stats = null;
 
-  // Detector propio (mismos umbrales con histéresis que el monitoreo).
   let eyeClosed = false;
   let closureStartedAt = null;
   let closureTrough = null;
-
-  // ---------- Ciclo de vida ----------
+  let jumpedThisClosure = false;
 
   function open(exitCallback) {
     onExit = exitCallback;
@@ -93,27 +81,29 @@ const BlinkGame = (() => {
     hintEl.hidden = true;
   }
 
-  // ---------- Entrada: parpadeos ----------
-
   function onEye(ear, now) {
     if (!eyeClosed && ear < baselineEar * BLINK_CLOSE_RATIO) {
       eyeClosed = true;
       closureStartedAt = now;
       closureTrough = ear;
-      // El salto se dispara al iniciar el cierre para que el juego responda sin retraso.
-      if (phase === "running") jump(now);
+      jumpedThisClosure = false;
       return;
     }
     if (!eyeClosed) return;
 
     closureTrough = Math.min(closureTrough, ear);
-    if (ear <= baselineEar * BLINK_OPEN_RATIO) return;
+    if (ear <= baselineEar * BLINK_OPEN_RATIO) {
+      if (!jumpedThisClosure && phase === "running" && now - closureStartedAt >= MIN_CLOSURE_MS && closureTrough <= jumpThreshold()) {
+        jumpedThisClosure = true;
+        jump(now);
+      }
+      return;
+    }
 
     eyeClosed = false;
     const duration = now - closureStartedAt;
     if (duration < MIN_CLOSURE_MS || duration > MAX_BLINK_MS || phase !== "running") return;
 
-    // Parpadeo completo: el párpado llegó a cubrir al menos el 80 % de la apertura.
     const floor = closedEyeFloor();
     const complete = closureTrough <= floor + P80_OPENNESS * (baselineEar - floor);
     stats.blinks += 1;
@@ -122,8 +112,13 @@ const BlinkGame = (() => {
     updateHud();
   }
 
+  function jumpThreshold() {
+    const floor = closedEyeFloor();
+    return floor + JUMP_OPENNESS * (baselineEar - floor);
+  }
+
   function jump(now) {
-    if (jumpStartedAt !== null && now - jumpStartedAt < AIRTIME_MS) return; // sin doble salto
+    if (jumpStartedAt !== null && now - jumpStartedAt < AIRTIME_MS) return;
     jumpStartedAt = now;
   }
 
@@ -133,8 +128,6 @@ const BlinkGame = (() => {
     clearTimeout(hintTimer);
     hintTimer = setTimeout(() => (hintEl.hidden = true), HINT_MS);
   }
-
-  // ---------- Bucle del juego ----------
 
   function loop(now) {
     const dt = Math.min(now - lastFrameAt, MAX_FRAME_MS);
@@ -167,7 +160,6 @@ const BlinkGame = (() => {
     return { ground, radius, legs: radius * 0.75, eyeX: size.w * 0.2 };
   }
 
-  // Altura del salto (0 = apoyado en el suelo).
   function jumpHeight(now) {
     if (jumpStartedAt === null) return 0;
     const t = (now - jumpStartedAt) / AIRTIME_MS;
@@ -208,7 +200,6 @@ const BlinkGame = (() => {
     obstacles = obstacles.filter((o) => o.x + o.w > -20);
   }
 
-  // Zona de choque con la misma forma que el dibujo: círculo del ojo + rectángulo de las patas.
   function characterHitbox(x, feetY, r, legs) {
     const cy = feetY - legs - r;
     return {
@@ -219,7 +210,6 @@ const BlinkGame = (() => {
 
   function collides(body, rect) {
     const { circle, legs } = body;
-    // Distancia del centro del círculo al punto más cercano del rectángulo.
     const nearestX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.w));
     const nearestY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.h));
     const touchesCircle = Math.hypot(circle.x - nearestX, circle.y - nearestY) < circle.r;
@@ -248,8 +238,6 @@ const BlinkGame = (() => {
     }
     document.getElementById("game-sum-message").textContent = mensaje;
   }
-
-  // ---------- Dibujo ----------
 
   function readColors() {
     const css = getComputedStyle(document.documentElement);
@@ -317,7 +305,6 @@ const BlinkGame = (() => {
     ctx.fill();
   }
 
-  // Ojo con patas. feetY es la altura de los pies; el párpado copia el del usuario.
   function drawEyeCharacter(now, x, feetY, r, legs, airborne, hurt) {
     const cy = feetY - legs - r;
     const line = Math.max(2, r * 0.12);
@@ -326,7 +313,6 @@ const BlinkGame = (() => {
     ctx.lineWidth = line;
     ctx.strokeStyle = colors.outline;
 
-    // Patas: caminan en el suelo y se recogen en el aire.
     const step = airborne || phase !== "running" ? 0 : Math.sin(now / 90) * r * 0.35;
     [[-0.4, step], [0.4, -step]].forEach(([side, swing]) => {
       const hipX = x + side * r;
@@ -340,14 +326,12 @@ const BlinkGame = (() => {
       ctx.stroke();
     });
 
-    // Globo ocular
     ctx.fillStyle = hurt ? "#ffd6d6" : "#ffffff";
     ctx.beginPath();
     ctx.arc(x, cy, r, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    // Iris y pupila, mirando hacia los obstáculos
     const irisX = x + r * 0.25;
     ctx.fillStyle = hurt ? colors.hit : colors.iris;
     ctx.beginPath();
@@ -362,7 +346,6 @@ const BlinkGame = (() => {
     ctx.arc(irisX - r * 0.15, cy - r * 0.17, r * 0.1, 0, Math.PI * 2);
     ctx.fill();
 
-    // Párpado: baja cuando el usuario cierra los ojos (retroalimentación de la detección).
     if (eyeClosed) {
       ctx.save();
       ctx.beginPath();
@@ -374,7 +357,6 @@ const BlinkGame = (() => {
       ctx.beginPath();
       ctx.arc(x, cy, r, 0, Math.PI * 2);
       ctx.stroke();
-      // Pestañas sobre la línea del párpado cerrado
       ctx.beginPath();
       ctx.moveTo(x - r, cy);
       ctx.quadraticCurveTo(x, cy + r * 0.45, x + r, cy);
@@ -388,8 +370,6 @@ const BlinkGame = (() => {
     }
   }
 
-  // ---------- HUD ----------
-
   function updateHud() {
     document.getElementById("game-hud-cleared").textContent = stats.cleared;
     document.getElementById("game-hud-hits").textContent = stats.hits;
@@ -400,8 +380,6 @@ const BlinkGame = (() => {
     const restante = Math.max(0, Math.ceil((DURATION_MS - (now - phaseStartedAt)) / 1000));
     document.getElementById("game-hud-time").textContent = `${restante}s`;
   }
-
-  // ---------- Eventos ----------
 
   document.getElementById("game-start-btn").addEventListener("click", begin);
   document.getElementById("game-again-btn").addEventListener("click", begin);

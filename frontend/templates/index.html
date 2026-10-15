@@ -12,7 +12,6 @@
 </head>
 <body>
 
-  <!-- Sprite de íconos: se referencian con <svg><use href="#i-..."/></svg> -->
   <svg xmlns="http://www.w3.org/2000/svg" hidden>
     <defs>
       <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
@@ -48,6 +47,12 @@
       <symbol id="i-arrow-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <path d="M19 12H5M11 6l-6 6 6 6"/>
       </symbol>
+      <symbol id="i-trend-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 19V5M6 11l6-6 6 6"/>
+      </symbol>
+      <symbol id="i-trend-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 5v14M6 13l6 6 6-6"/>
+      </symbol>
       <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
         <rect x="3.5" y="4.5" width="17" height="16" rx="3"/><path d="M3.5 9.5h17M8 3v3M16 3v3"/>
       </symbol>
@@ -78,7 +83,6 @@
     </defs>
   </svg>
 
-  <!-- ============================ AUTENTICACIÓN ============================ -->
   <main id="auth-view">
     <div class="auth-stage">
       <aside class="auth-visual">
@@ -133,7 +137,7 @@
 
           <div class="segmented" role="tablist">
             <button type="button" class="segmented__item is-active" id="tab-login" role="tab" aria-selected="true" aria-controls="login-section">Iniciar sesión</button>
-            <button type="button" class="segmented__item" id="tab-register" role="tab" aria-selected="false" aria-controls="register-section">Crear cuenta</button>
+            <button type="button" class="segmented__item" id="tab-register" role="tab" aria-selected="false" aria-controls="register-section" tabindex="-1">Crear cuenta</button>
           </div>
 
           <section id="login-section" role="tabpanel" aria-labelledby="tab-login">
@@ -203,7 +207,6 @@
     </div>
   </main>
 
-  <!-- ============================ PANEL PRINCIPAL ============================ -->
   <main id="dashboard-view" hidden>
     <header class="topbar">
       <div class="brand">
@@ -278,7 +281,6 @@
     </div>
   </main>
 
-  <!-- ============================ MONITOREO ============================ -->
   <main id="monitoreo-view" hidden>
     <header class="topbar topbar--compact">
       <button type="button" id="mon-back-btn" class="btn btn--ghost">
@@ -298,7 +300,6 @@
       </div>
     </header>
 
-    <!-- Paso 1: preparación de la sesión -->
     <section id="mon-setup" class="page page--narrow">
       <form id="setup-form" class="card setup" novalidate>
         <header class="setup__header">
@@ -360,7 +361,6 @@
       </form>
     </section>
 
-    <!-- Paso 2: sesión en curso -->
     <section id="mon-live" class="mon-live" hidden>
       <div class="mon-content card" id="mon-content">
         <iframe id="viewer-pdf" title="Documento PDF" hidden></iframe>
@@ -383,7 +383,10 @@
         </div>
 
         <div id="break-overlay" class="break" hidden>
-          <div class="break__ring"><span id="break-count">20</span></div>
+          <div class="break__timer">
+            <span class="break__ring" aria-hidden="true"></span>
+            <span id="break-count" class="break__count" aria-label="Segundos restantes">20</span>
+          </div>
           <h2>Mira algo a unos 6 metros</h2>
           <p>Relaja la vista y parpadea con calma. La medición se pausa durante el descanso.</p>
           <button type="button" id="break-skip-btn" class="btn btn--ghost">Terminar descanso</button>
@@ -447,16 +450,34 @@
         </div>
 
         <div id="metric-fatiga-card" class="level card">
-          <p class="level__label">Nivel de fatiga</p>
+          <p class="level__label">Nivel de fatiga visual</p>
           <p class="level__value" id="metric-fatiga">Esperando datos…</p>
-          <p class="level__hint muted small" id="metric-fatiga-hint">Se evalúa cada 15 s con la ventana del último minuto.</p>
+          <p class="level__hint muted small" id="metric-fatiga-hint">Se evalúa cada minuto con lo ocurrido en ese minuto.</p>
+        </div>
+
+        <div class="live-charts card">
+          <p class="live-charts__title">Apertura del ojo <small>últimos 30 s</small></p>
+          <div class="live-charts__ear">
+            <canvas id="live-ear-chart" role="img" aria-label="Apertura del ojo (EAR) en los últimos 30 segundos; cada caída bajo la línea de parpadeo es un parpadeo"></canvas>
+          </div>
+          <div class="live-charts__minutes">
+            <figure>
+              <figcaption>Parpadeos/min</figcaption>
+              <div class="live-charts__mini"><canvas id="live-parpadeos-chart" role="img" aria-label="Parpadeos por minuto en cada minuto de la sesión"></canvas></div>
+            </figure>
+            <figure>
+              <figcaption>Incompletos %</figcaption>
+              <div class="live-charts__mini"><canvas id="live-incompletos-chart" role="img" aria-label="Porcentaje de parpadeos incompletos en cada minuto de la sesión"></canvas></div>
+            </figure>
+          </div>
         </div>
 
         <div class="metrics">
-          <div class="metric"><span class="metric__label">PERCLOS</span><span class="metric__value"><span id="metric-perclos">--</span><small>%</small></span></div>
           <div class="metric"><span class="metric__label">Parpadeos</span><span class="metric__value"><span id="metric-parpadeo">--</span><small>/min</small></span></div>
+          <div class="metric"><span class="metric__label">Incompletos</span><span class="metric__value"><span id="metric-incompletos">--</span><small>%</small></span></div>
           <div class="metric"><span class="metric__label">Cierre medio</span><span class="metric__value"><span id="metric-cierre">--</span><small>ms</small></span></div>
-          <div class="metric"><span class="metric__label">Cierres &gt; 0,5 s</span><span class="metric__value"><span id="metric-prolongados">--</span></span></div>
+          <div class="metric" title="Control de somnolencia"><span class="metric__label">PERCLOS</span><span class="metric__value"><span id="metric-perclos">--</span><small>%</small></span></div>
+          <div class="metric" title="Control de somnolencia"><span class="metric__label">Cierres &gt; 0,5 s</span><span class="metric__value"><span id="metric-prolongados">--</span></span></div>
           <div class="metric"><span class="metric__label">EAR</span><span class="metric__value"><span id="metric-ear">--</span></span></div>
           <div class="metric"><span class="metric__label">Mov. ocular</span><span class="metric__value"><span id="metric-velocidad">--</span></span></div>
         </div>
@@ -468,10 +489,9 @@
       </aside>
     </section>
 
-    <!-- Paso 3: KSS final -->
-    <dialog id="finish-dialog" class="dialog">
+    <dialog id="finish-dialog" class="dialog" aria-labelledby="finish-heading">
       <form method="dialog" id="finish-form" class="dialog__body" novalidate>
-        <h2>Antes de terminar…</h2>
+        <h2 id="finish-heading">Antes de terminar…</h2>
         <p class="muted">¿Qué tan somnoliento te sientes ahora? <small>(KSS)</small></p>
         <div class="kss" id="kss-final" data-kss-name="kss_final"></div>
         <p id="finish-error" class="notice notice--error" role="alert" hidden></p>
@@ -486,7 +506,10 @@
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous"></script>
+
   <script src="/static/js/api.js"></script>
+  <script src="/static/js/charts.js"></script>
   <script src="/static/js/views.js"></script>
   <script src="/static/js/monitoreo.js"></script>
   <script src="/static/js/blink-game.js"></script>

@@ -1,5 +1,5 @@
 const NIVEL_ORDEN = { sin_fatiga: 0, leve: 1, moderada: 2 };
-const NIVEL_LABEL = { sin_fatiga: "Sin fatiga", leve: "Fatiga leve", moderada: "Fatiga moderada" };
+const NIVEL_LABEL = { sin_fatiga: "Sin fatiga", leve: "Fatiga visual leve", moderada: "Fatiga visual moderada" };
 const NIVEL_CLASE = { sin_fatiga: "badge--ok", leve: "badge--leve", moderada: "badge--moderada" };
 const MOMENTO_LABEL = { pre: "Antes de la jornada", post: "Después de la jornada" };
 const ACTIVIDAD_LABEL = { lectura: "Lectura PDF", video: "Video", libre: "Solo monitoreo" };
@@ -55,14 +55,11 @@ function renderStats(sesiones) {
     : "–";
 }
 
-// ---------- Comparativa antes / después ----------
-// Solo descriptiva: promedia las mediciones de las sesiones de cada momento.
-
 const COMPARE_METRICAS = [
-  { clave: "perclos", label: "PERCLOS", unidad: "%", decimales: 1, peorSiSube: true },
   { clave: "parpadeos_min", label: "Parpadeos", unidad: "/min", decimales: 1, peorSiSube: false },
+  { clave: "parpadeos_incompletos_pct", label: "Parpadeos incompletos", unidad: "%", decimales: 0, peorSiSube: true },
   { clave: "tiempo_cierre", label: "Cierre medio", unidad: "ms", decimales: 0, peorSiSube: true },
-  { clave: "kss", label: "Somnolencia (KSS)", unidad: "/9", decimales: 1, peorSiSube: true },
+  { clave: "kss", label: "Somnolencia (KSS, control)", unidad: "/9", decimales: 1, peorSiSube: true },
 ];
 
 function resumenPorMomento(sesiones, momento) {
@@ -96,14 +93,15 @@ function renderCompare(sesiones) {
     let tendencia = "";
     if (antes !== null && despues !== null && antes !== despues) {
       const empeora = despues > antes === m.peorSiSube;
-      tendencia = `<span class="trend trend--${empeora ? "bad" : "good"}">${despues > antes ? "▲" : "▼"}</span>`;
+      const icono = despues > antes ? "i-trend-up" : "i-trend-down";
+      tendencia = `<span class="trend trend--${empeora ? "bad" : "good"}"><svg aria-hidden="true"><use href="#${icono}"/></svg><span class="sr-only">${empeora ? "empeora" : "mejora"}</span></span>`;
     }
     return `
       <div class="compare__item">
         <p class="compare__label">${m.label}</p>
         <div class="compare__values">
           <div><small>Antes</small><strong>${formatValor(antes, m.decimales)}</strong></div>
-          <span class="compare__arrow" aria-hidden="true">→</span>
+          <span class="compare__arrow" aria-hidden="true"><svg><use href="#i-arrow-right"/></svg></span>
           <div><small>Después</small><strong>${formatValor(despues, m.decimales)}${tendencia}</strong></div>
         </div>
         <p class="compare__unit muted small">${m.unidad}</p>
@@ -111,18 +109,16 @@ function renderCompare(sesiones) {
   }).join("");
 }
 
-// ---------- Análisis interpretativo (n8n + Gemini) ----------
-
 const PARAMETRO_LABEL = {
-  perclos: "PERCLOS",
   parpadeos_min: "Frecuencia de parpadeo",
   sebr: "Frecuencia de parpadeo",
+  parpadeos_incompletos_pct: "Parpadeos incompletos",
   tiempo_cierre: "Tiempo de cierre",
   velocidad_ocular: "Movimiento ocular",
-  kss: "Somnolencia (KSS)",
+  perclos: "PERCLOS (control de somnolencia)",
+  kss: "Somnolencia (KSS, control)",
 };
 
-// Misma escala de color que NIVEL_CLASE: el nivel de la IA y el de las reglas se ven igual.
 const SEVERIDAD_CLASE = {
   "sin fatiga": "badge--ok",
   leve: "badge--leve",
@@ -140,11 +136,9 @@ function formatParametro(valor) {
 }
 
 function renderAnalisis(detalle) {
-  // Se aceptan también las claves del flujo anterior para no romper sesiones ya guardadas.
   const resumen = detalle.resumen_general ?? detalle.diagnostico_general;
   const nivel = detalle.nivel_fatiga_final ?? detalle.severidad_fatiga_final ?? "";
 
-  // JSONB no conserva el orden de las claves: se ordenan según PARAMETRO_LABEL.
   const orden = Object.keys(PARAMETRO_LABEL);
   const posicion = (clave) => (orden.includes(clave) ? orden.indexOf(clave) : orden.length);
   const parametros = Object.entries(detalle.evaluacion_parametros || {})
@@ -170,7 +164,7 @@ function renderAnalisis(detalle) {
     </div>
     <p class="analysis__summary">${escapeHtml(resumen)}</p>
     <div class="analysis__params">${parametros}</div>
-    ${recomendaciones ? `<h4>Recomendaciones</h4><ul class="analysis__recs">${recomendaciones}</ul>` : ""}
+    ${recomendaciones ? `<h3>Recomendaciones</h3><ul class="analysis__recs">${recomendaciones}</ul>` : ""}
     <p class="analysis__disclaimer">${escapeHtml(detalle.aviso || "Análisis orientativo y preventivo; no reemplaza la evaluación de un profesional de la salud visual.")}</p>
   `;
 }
@@ -228,6 +222,8 @@ function renderSessionRow(sesion) {
     </div>
   `;
 
+  if (sesion.mediciones.length > 0) row.append(renderResumenToggle(sesion));
+
   if (sesion.estado_analisis !== "sin_datos") {
     const status = document.createElement("div");
     status.className = "analysis-status";
@@ -243,7 +239,46 @@ function renderSessionRow(sesion) {
   return row;
 }
 
-// ---------- Estado del análisis: disponible / generándose / no disponible ----------
+let sesionPorAbrir = null;
+
+function abrirResumenAlVolver(sesionId) {
+  sesionPorAbrir = sesionId;
+}
+
+function renderResumenToggle(sesion) {
+  const wrap = document.createElement("div");
+  wrap.className = "session-summary";
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "btn btn--link";
+  toggle.textContent = "Ver resumen y gráficas";
+  toggle.setAttribute("aria-expanded", "false");
+  const box = document.createElement("div");
+  box.className = "session-summary__body";
+  box.hidden = true;
+  let liberar = null;
+
+  toggle.addEventListener("click", () => {
+    const abrir = box.hidden;
+    box.hidden = !abrir;
+    toggle.setAttribute("aria-expanded", String(abrir));
+    toggle.textContent = abrir ? "Ocultar resumen" : "Ver resumen y gráficas";
+    if (abrir) {
+      liberar = Charts.renderSession(box, sesion);
+    } else {
+      liberar?.();
+      liberar = null;
+      box.innerHTML = "";
+    }
+  });
+
+  wrap.append(toggle, box);
+  if (sesion.id === sesionPorAbrir) {
+    sesionPorAbrir = null;
+    queueMicrotask(() => toggle.click());
+  }
+  return wrap;
+}
 
 const ANALISIS_POLL_MS = 3_000;
 const ANALISIS_TIMEOUT_MS = 60_000;
@@ -269,7 +304,6 @@ function renderEstadoAnalisis(sesionId, estado, status, box, mensaje = "") {
     return;
   }
 
-  // no_disponible
   status.innerHTML = `
     <span class="analysis-status__text analysis-status__text--error">
       <svg class="inline-icon" aria-hidden="true"><use href="#i-alert"/></svg>
@@ -286,7 +320,6 @@ function renderEstadoAnalisis(sesionId, estado, status, box, mensaje = "") {
 async function reintentarAnalisis(sesionId, status, box, button) {
   button.disabled = true;
   try {
-    // Se recuerda el intento fallido para reconocer cuándo llega uno nuevo.
     const anterior = await apiFetch(`/sessions/${sesionId}/diagnosis`);
     await apiFetch(`/sessions/${sesionId}/diagnosis/retry`, { method: "POST" });
     renderEstadoAnalisis(sesionId, "pendiente", status, box);
@@ -296,12 +329,11 @@ async function reintentarAnalisis(sesionId, status, box, button) {
   }
 }
 
-// Consulta el análisis hasta que aparezca un intento más reciente que `anterior`.
 async function esperarAnalisis(sesionId, anterior, status, box) {
   const limite = Date.now() + ANALISIS_TIMEOUT_MS;
   while (Date.now() < limite) {
     await new Promise((resolve) => setTimeout(resolve, ANALISIS_POLL_MS));
-    if (!status.isConnected) return; // el panel se volvió a dibujar
+    if (!status.isConnected) return;
     try {
       const data = await apiFetch(`/sessions/${sesionId}/diagnosis`);
       if (data.generado_en && data.generado_en !== anterior) {
@@ -309,7 +341,7 @@ async function esperarAnalisis(sesionId, anterior, status, box) {
         return;
       }
     } catch {
-      /* error de red transitorio: se vuelve a intentar */
+
     }
   }
   renderEstadoAnalisis(sesionId, "no_disponible", status, box, "El análisis tardó demasiado");
@@ -322,18 +354,24 @@ async function refreshDashboard() {
 
   errorEl.hidden = true;
   empty.hidden = true;
-  list.innerHTML = "";
+  list.innerHTML = `<p class="analysis-status__text"><span class="spinner" aria-hidden="true"></span>Cargando tus sesiones…</p>`;
+  list.setAttribute("aria-busy", "true");
 
   let sesiones;
   try {
     sesiones = await apiFetch("/users/me/history");
   } catch (err) {
+    list.innerHTML = "";
+    list.removeAttribute("aria-busy");
     errorEl.textContent = `No se pudo cargar tu historial: ${err.message}`;
     errorEl.hidden = false;
     renderStats([]);
     return;
   }
 
+  list.innerHTML = "";
+  list.removeAttribute("aria-busy");
+  Charts.releaseDetached();
   renderStats(sesiones);
   renderCompare(sesiones);
 

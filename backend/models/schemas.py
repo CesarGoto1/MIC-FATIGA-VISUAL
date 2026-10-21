@@ -91,6 +91,7 @@ class SesionOut(BaseModel):
     iniciada_en: str
     finalizada_en: Optional[str]
     estado_analisis: EstadoAnalisis
+    nivel_fatiga: Optional[NivelFatiga]
     mediciones: list[MedicionOut]
 
 

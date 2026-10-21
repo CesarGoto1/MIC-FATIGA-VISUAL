@@ -196,9 +196,9 @@ function renderSessionRow(sesion) {
   const row = document.createElement("article");
   row.className = "session";
 
-  const peor = peorNivel(sesion.mediciones);
-  const badgeLabel = peor ? NIVEL_LABEL[peor] : "Sin datos";
-  const badgeClase = peor ? NIVEL_CLASE[peor] : "badge--neutral";
+  const nivel = sesion.nivel_fatiga;
+  const badgeLabel = nivel ? NIVEL_LABEL[nivel] : "Sin datos";
+  const badgeClase = nivel ? NIVEL_CLASE[nivel] : "badge--neutral";
 
   const meta = [
     ACTIVIDAD_LABEL[sesion.actividad] || sesion.actividad,
@@ -281,7 +281,7 @@ function renderResumenToggle(sesion) {
 }
 
 const ANALISIS_POLL_MS = 3_000;
-const ANALISIS_TIMEOUT_MS = 60_000;
+const ANALISIS_TIMEOUT_MS = 120_000;
 
 function renderEstadoAnalisis(sesionId, estado, status, box, mensaje = "") {
   status.innerHTML = "";

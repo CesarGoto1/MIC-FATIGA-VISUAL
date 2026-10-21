@@ -6,7 +6,8 @@ from backend.database import get_db
 from backend.dependencies import get_current_user_id
 from backend.models.orm import Sesion
 from backend.models.schemas import MedicionOut, SesionOut
-from backend.routers.sessions import MIN_MEDICIONES_PARA_ANALISIS, cerrar_sesiones_abandonadas
+from backend.fatigue import clasificar_tramo
+from backend.routers.sessions import MIN_MEDICIONES_PARA_ANALISIS, cerrar_sesiones_abandonadas, tramo_final_de
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -38,6 +39,7 @@ def get_history(
 
     resultado = []
     for sesion in sesiones:
+        ordenadas = sorted(sesion.mediciones, key=lambda m: m.registrado_en)
         mediciones = [
             MedicionOut(
                 id=m.id,
@@ -53,7 +55,7 @@ def get_history(
                 somnolencia=m.somnolencia,
                 registrado_en=m.registrado_en.isoformat(),
             )
-            for m in sorted(sesion.mediciones, key=lambda m: m.registrado_en)
+            for m in ordenadas
         ]
 
         resultado.append(
@@ -66,6 +68,7 @@ def get_history(
                 iniciada_en=sesion.iniciada_en.isoformat(),
                 finalizada_en=sesion.finalizada_en.isoformat() if sesion.finalizada_en else None,
                 estado_analisis=_estado_analisis(sesion),
+                nivel_fatiga=clasificar_tramo(tramo_final_de(ordenadas)) if ordenadas else None,
                 mediciones=mediciones,
             )
         )

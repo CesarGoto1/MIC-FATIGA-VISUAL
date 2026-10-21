@@ -17,6 +17,12 @@ const MAX_VOLUNTARY_BLINK_MS = 1_500;
 const CLOSURE_CALIBRATION_TIMEOUT_MS = 20_000;
 const DEFAULT_FLOOR_RATIO = 0.4;
 
+const SMOOTHING_FRAMES = 3;
+const BASELINE_WINDOW_MS = 20_000;
+const BASELINE_MIN_SPAN_MS = 10_000;
+const BASELINE_UPDATE_MS = 2_000;
+const BASELINE_MAX_DRIFT = 0.3;
+
 const WINDOW_MS = 60_000;
 const MAX_FRAME_GAP_MS = 250;
 const FACE_LOST_MS = 1_500;
@@ -27,6 +33,7 @@ const MIN_OBSERVED_MS = 20_000;
 const DETECTOR_TIMEOUT_MS = 20_000;
 
 const BREAK_SECONDS = 20;
+const POST_EXERCISE_GRACE_MS = 15_000;
 const ALERT_COOLDOWN_MS = 120_000;
 
 const setupSection = document.getElementById("mon-setup");
@@ -72,6 +79,11 @@ let startedAt = null;
 let baselineEar = null;
 let calibrationSamples = [];
 let calibrationStartedAt = null;
+let eyeBaselines = null;
+let calibratedBaselines = null;
+let recentSignal = [];
+let eyeHistory = [];
+let lastBaselineUpdateAt = 0;
 let fullClosureEar = null;
 let closureCalibration = null;
 
@@ -87,6 +99,7 @@ let lastSampleAt = null;
 let lastFaceAt = null;
 let lastIris = null;
 let paused = false;
+let graceUntil = 0;
 let eyeListener = null;
 let lastSentAt = 0;
 let lastAlert = { nivel: null, dismissedAt: 0 };
@@ -146,18 +159,19 @@ function onFaceMeshResults(results) {
   const ear = (earRight + earLeft) / 2;
 
   if (baselineEar === null) {
-    calibrate(ear, now);
+    calibrate(earRight, earLeft, now);
     return;
   }
+  const signal = bilateralSignal(earRight, earLeft);
   if (fullClosureEar === null) {
-    calibrateClosure(ear, now);
+    calibrateClosure(signal, now);
     return;
   }
   if (eyeListener) {
-    eyeListener(Math.max(earRight, earLeft), now);
+    eyeListener(signal, now);
     return;
   }
-  if (paused) {
+  if (paused || now < graceUntil) {
     lastSampleAt = null;
     lastIris = null;
     return;
@@ -166,10 +180,11 @@ function onFaceMeshResults(results) {
   const dt = lastSampleAt === null ? 0 : Math.min(now - lastSampleAt, MAX_FRAME_GAP_MS);
   lastSampleAt = now;
 
-  detectBlink(ear, now);
+  trackBaseline(earRight, earLeft, now);
+  detectBlink(signal, now);
 
-  samples.push({ t: now, dt, ear, p80: ear <= p80Threshold() });
-  Charts.pushEar(now, ear);
+  samples.push({ t: now, dt, ear, p80: signal <= p80Threshold() });
+  Charts.pushEar(now, signal);
 
   const offsetRight = irisOffset(landmarks, RIGHT_EYE, RIGHT_IRIS_CENTER);
   const offsetLeft = irisOffset(landmarks, LEFT_EYE, LEFT_IRIS_CENTER);
@@ -183,16 +198,20 @@ function onFaceMeshResults(results) {
   updateLiveMetrics(ear);
 }
 
-function calibrate(ear, now) {
+function calibrate(earRight, earLeft, now) {
   if (calibrationStartedAt === null) calibrationStartedAt = now;
-  calibrationSamples.push(ear);
+  calibrationSamples.push({ right: earRight, left: earLeft });
 
   const progress = Math.min(1, (now - calibrationStartedAt) / CALIBRATION_MS);
   calibrationBar.style.transform = `scaleX(${progress})`;
 
   if (progress >= 1 && calibrationSamples.length >= MIN_CALIBRATION_SAMPLES) {
-    baselineEar = median(calibrationSamples);
-    console.info(`Línea base de EAR (mediana): ${baselineEar.toFixed(3)}`);
+    calibratedBaselines = {
+      right: median(calibrationSamples.map((c) => c.right)),
+      left: median(calibrationSamples.map((c) => c.left)),
+    };
+    setEyeBaselines(calibratedBaselines);
+    console.info(`Línea base de EAR (der. ${eyeBaselines.right.toFixed(3)}, izq. ${eyeBaselines.left.toFixed(3)})`);
     calibrationBar.style.transform = "scaleX(0)";
     calibrationText.textContent = `Ahora parpadea ${FULL_BLINKS_REQUIRED} veces cerrando los ojos por completo, sin apretar.`;
   }
@@ -224,6 +243,34 @@ function calibrateClosure(ear, now) {
   }
 }
 
+function setEyeBaselines(baselines) {
+  eyeBaselines = { ...baselines };
+  baselineEar = (eyeBaselines.right + eyeBaselines.left) / 2;
+}
+
+function bilateralSignal(earRight, earLeft) {
+  const openness = Math.max(earRight / eyeBaselines.right, earLeft / eyeBaselines.left);
+  recentSignal.push(openness * baselineEar);
+  if (recentSignal.length > SMOOTHING_FRAMES) recentSignal.shift();
+  return median(recentSignal);
+}
+
+function trackBaseline(earRight, earLeft, now) {
+  eyeHistory.push({ t: now, right: earRight, left: earLeft });
+  while (eyeHistory.length && eyeHistory[0].t < now - BASELINE_WINDOW_MS) eyeHistory.shift();
+  if (now - lastBaselineUpdateAt < BASELINE_UPDATE_MS) return;
+  if (eyeHistory.length < 2 || now - eyeHistory[0].t < BASELINE_MIN_SPAN_MS) return;
+  lastBaselineUpdateAt = now;
+
+  const clamp = (value, reference) =>
+    Math.min(reference * (1 + BASELINE_MAX_DRIFT), Math.max(reference * (1 - BASELINE_MAX_DRIFT), value));
+  setEyeBaselines({
+    right: clamp(median(eyeHistory.map((e) => e.right)), calibratedBaselines.right),
+    left: clamp(median(eyeHistory.map((e) => e.left)), calibratedBaselines.left),
+  });
+  Charts.setEarThresholds({ blinkThreshold: baselineEar * BLINK_CLOSE_RATIO, p80Threshold: p80Threshold() });
+}
+
 function finishCalibration() {
   calibrationOverlay.hidden = true;
   Charts.startLive({ blinkThreshold: baselineEar * BLINK_CLOSE_RATIO, p80Threshold: p80Threshold() });
@@ -249,9 +296,10 @@ function detectBlink(ear, now) {
   const duration = now - closureStartedAt;
   if (duration < MIN_CLOSURE_MS) return;
 
+  const reachedP80 = closureTrough <= p80Threshold();
   if (duration <= MAX_BLINK_MS) {
-    blinks.push({ t: now, duration, complete: closureTrough <= p80Threshold() });
-  } else {
+    blinks.push({ t: now, duration, complete: reachedP80 });
+  } else if (reachedP80) {
     longClosures.push({ t: now });
   }
 }
@@ -385,11 +433,11 @@ function showFatigueLevel(nivel) {
 const MENSAJES_ALERTA = {
   leve: {
     titulo: "Fatiga visual leve",
-    texto: "Parpadea conscientemente y considera una pausa breve para tus ojos.",
+    texto: "Parpadeas poco o sin cerrar del todo. Un minuto de ejercicio de parpadeo ayuda a hidratar tus ojos.",
   },
   moderada: {
     titulo: "Fatiga visual moderada",
-    texto: "Te recomendamos detenerte y descansar la vista unos segundos.",
+    texto: "Parpadeas poco y sin cerrar del todo. Haz el ejercicio de parpadeo para recuperar parpadeos completos.",
   },
   somnolencia: {
     titulo: "Signos de somnolencia",
@@ -410,7 +458,7 @@ function maybeAlert(nivel) {
   document.getElementById("toast-title").textContent = mensaje.titulo;
   document.getElementById("toast-text").textContent = mensaje.texto;
   toastEl.dataset.nivel = nivel;
-  const sugerirJuego = nivel === "leve";
+  const sugerirJuego = nivel !== "somnolencia";
   document.getElementById("toast-game-btn").hidden = !sugerirJuego;
   document.getElementById("toast-break-btn").hidden = sugerirJuego;
   toastEl.hidden = false;
@@ -435,6 +483,7 @@ function endGame() {
   eyeListener = null;
   if (sesionId === null) return;
   resetWindow();
+  graceUntil = performance.now() + POST_EXERCISE_GRACE_MS;
   paused = false;
   setStatus("running", "Monitoreando");
 }
@@ -543,12 +592,18 @@ async function startMonitoring(setup) {
   sesionId = session.sesion_id;
 
   baselineEar = null;
+  eyeBaselines = null;
+  calibratedBaselines = null;
+  recentSignal = [];
+  eyeHistory = [];
+  lastBaselineUpdateAt = 0;
   calibrationSamples = [];
   calibrationStartedAt = null;
   fullClosureEar = null;
   closureCalibration = null;
   lastFaceAt = null;
   paused = false;
+  graceUntil = 0;
   lastAlert = { nivel: null, dismissedAt: 0 };
   lastSentAt = 0;
   resetWindow();

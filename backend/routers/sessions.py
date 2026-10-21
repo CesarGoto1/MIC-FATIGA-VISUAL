@@ -174,13 +174,18 @@ def _promedio_tramo(mediciones: list[Medicion]) -> dict:
     return resultado
 
 
+def tramo_final_de(mediciones: list[Medicion]) -> dict:
+    tramo = max(1, math.ceil(len(mediciones) / 4))
+    return _promedio_tramo(mediciones[-tramo:])
+
+
 def construir_payload_analisis(sesion: Sesion, mediciones: list[Medicion]) -> dict:
     tramo = max(1, math.ceil(len(mediciones) / 4))
     duracion_min = None
     if sesion.finalizada_en is not None and sesion.iniciada_en is not None:
         duracion_min = round((sesion.finalizada_en - sesion.iniciada_en).total_seconds() / 60, 1)
 
-    tramo_final = _promedio_tramo(mediciones[-tramo:])
+    tramo_final = tramo_final_de(mediciones)
     return {
         "sesion": {
             "actividad": sesion.actividad,
@@ -214,7 +219,7 @@ def finish_session(
 
     sesion.kss_final = data.kss_final
     sesion.finalizada_en = func.now()
-    db.flush()
+    db.commit()
     db.refresh(sesion)
 
     _programar_analisis(db, sesion, background_tasks)

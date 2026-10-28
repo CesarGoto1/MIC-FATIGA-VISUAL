@@ -27,6 +27,15 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     usuario_id: int
     nombre: str
+    codigo_participante: str
+    es_admin: bool = False
+
+
+class PerfilOut(BaseModel):
+    usuario_id: int
+    nombre: str
+    codigo_participante: str
+    es_admin: bool
 
 
 class SessionCreateRequest(BaseModel):
@@ -100,3 +109,33 @@ class DiagnosticoOut(BaseModel):
     texto: Optional[str]
     detalle: Optional[dict] = None
     generado_en: Optional[str]
+
+
+class AdminParticipanteOut(BaseModel):
+    codigo: str
+    sesiones: int
+    sesiones_pre: int
+    sesiones_post: int
+    ultima_sesion: Optional[str]
+
+
+class AdminSesionOut(BaseModel):
+    id: int
+    participante: str
+    actividad: str
+    momento: Optional[MomentoJornada]
+    kss_inicial: Optional[int]
+    kss_final: Optional[int]
+    iniciada_en: str
+    finalizada_en: Optional[str]
+    duracion_min: Optional[float]
+    num_mediciones: int
+    nivel_fatiga_tramo_final: Optional[NivelFatiga]
+    mediciones_con_somnolencia: int
+    somnolencia_tramo_final: Optional[bool]
+    estado_analisis: EstadoAnalisis
+
+
+class AdminSesionDetalleOut(AdminSesionOut):
+    mediciones: list[MedicionOut]
+    diagnostico: DiagnosticoOut

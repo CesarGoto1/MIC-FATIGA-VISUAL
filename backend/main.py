@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.types import Scope
 
-from backend.routers import auth, sessions, users
+from backend.routers import admin, auth, sessions, users
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
@@ -24,6 +24,7 @@ app = FastAPI(
 app.include_router(auth.router)
 app.include_router(sessions.router)
 app.include_router(users.router)
+app.include_router(admin.router)
 
 app.mount("/static", RevalidateStaticFiles(directory=FRONTEND_DIR / "static"), name="static")
 

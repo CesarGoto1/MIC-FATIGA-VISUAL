@@ -9,6 +9,16 @@ from backend.security import create_access_token, hash_password, verify_password
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+def _token_response(usuario: Usuario) -> TokenResponse:
+    return TokenResponse(
+        access_token=create_access_token(usuario.id),
+        usuario_id=usuario.id,
+        nombre=usuario.nombre,
+        codigo_participante=usuario.codigo,
+        es_admin=usuario.es_admin,
+    )
+
+
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(data: RegisterRequest, db: Session = Depends(get_db)):
     existe = db.query(Usuario).filter(Usuario.email == data.email).first()
@@ -26,8 +36,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     db.add(usuario)
     db.flush()
 
-    token = create_access_token(usuario.id)
-    return TokenResponse(access_token=token, usuario_id=usuario.id, nombre=usuario.nombre)
+    return _token_response(usuario)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -43,5 +52,4 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     if not verify_password(data.password, usuario.password_hash):
         raise credenciales_invalidas
 
-    token = create_access_token(usuario.id)
-    return TokenResponse(access_token=token, usuario_id=usuario.id, nombre=usuario.nombre)
+    return _token_response(usuario)

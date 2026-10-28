@@ -19,6 +19,10 @@ class Base(DeclarativeBase):
     pass
 
 
+def codigo_participante(usuario_id: int) -> str:
+    return f"P{usuario_id:03d}"
+
+
 class Usuario(Base):
 
     __tablename__ = "usuarios"
@@ -27,11 +31,16 @@ class Usuario(Base):
     nombre: Mapped[str] = mapped_column(String(120), nullable=False)
     email: Mapped[str] = mapped_column(String(160), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    es_admin: Mapped[bool] = mapped_column(default=False, server_default="false")
     creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     sesiones: Mapped[list["Sesion"]] = relationship(
         back_populates="usuario", cascade="all, delete-orphan"
     )
+
+    @property
+    def codigo(self) -> str:
+        return codigo_participante(self.id)
 
 
 class Sesion(Base):

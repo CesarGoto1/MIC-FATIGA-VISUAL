@@ -1,26 +1,57 @@
 const authView = document.getElementById("auth-view");
 const dashboardView = document.getElementById("dashboard-view");
 const monitoreoView = document.getElementById("monitoreo-view");
+const adminView = document.getElementById("admin-view");
 
 function showAuthView() {
   authView.hidden = false;
   dashboardView.hidden = true;
   monitoreoView.hidden = true;
+  adminView.hidden = true;
+}
+
+function renderPerfil() {
+  document.getElementById("dash-usuario-nombre").textContent = localStorage.getItem("usuario_nombre") || "";
+  const codigo = localStorage.getItem("codigo_participante");
+  document.getElementById("dash-codigo").hidden = !codigo;
+  document.getElementById("dash-codigo-valor").textContent = codigo || "";
+  document.getElementById("dash-admin-btn").hidden = !esAdmin();
+}
+
+async function refreshPerfil() {
+  try {
+    setPerfil(await apiFetch("/users/me"));
+  } catch {
+    return;
+  }
+  renderPerfil();
 }
 
 function showDashboardView() {
   authView.hidden = true;
   monitoreoView.hidden = true;
+  adminView.hidden = true;
   dashboardView.hidden = false;
 
-  document.getElementById("dash-usuario-nombre").textContent = localStorage.getItem("usuario_nombre") || "";
+  renderPerfil();
+  refreshPerfil();
 
   if (typeof refreshDashboard === "function") refreshDashboard();
+}
+
+function showAdminView() {
+  authView.hidden = true;
+  dashboardView.hidden = true;
+  monitoreoView.hidden = true;
+  adminView.hidden = false;
+
+  if (typeof refreshAdmin === "function") refreshAdmin();
 }
 
 function showMonitoreoView() {
   authView.hidden = true;
   dashboardView.hidden = true;
+  adminView.hidden = true;
   monitoreoView.hidden = false;
 
   if (typeof resetMonitoreo === "function") resetMonitoreo();

@@ -1989,7 +1989,109 @@ input {
   margin-top: 6px;
 }
 
+.participant-code {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin-top: 6px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.participant-code strong {
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.participant-code small {
+  flex-basis: 100%;
+  font-weight: 500;
+}
+
+.admin-card {
+  padding: 24px;
+}
+
+.admin-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.admin-filters__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.admin-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+.admin-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.admin-table th {
+  color: var(--ink-3);
+  font-weight: 600;
+}
+
+.admin-row {
+  cursor: pointer;
+}
+
+.admin-row:hover,
+.admin-row:focus-visible {
+  background: var(--surface-2);
+}
+
+.admin-detail__head {
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-detail__subtitle {
+  margin: 20px 0 10px;
+}
+
 @media (max-width: 960px) {
+  .admin-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .auth-stage {
     grid-template-columns: 1fr;
   }
@@ -2039,6 +2141,14 @@ input {
 @media (max-width: 640px) {
   .topbar__user {
     display: none;
+  }
+
+  .admin-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-card {
+    padding: 18px;
   }
 
   .hero,

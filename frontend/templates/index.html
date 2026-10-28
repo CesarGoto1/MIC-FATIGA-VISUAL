@@ -222,6 +222,7 @@
           <svg class="theme-toggle__sun"><use href="#i-sun"/></svg>
         </button>
         <span class="topbar__user">Hola, <strong id="dash-usuario-nombre"></strong></span>
+        <button type="button" id="dash-admin-btn" class="btn btn--ghost" hidden>Administración</button>
         <button type="button" id="dash-logout-btn" class="btn btn--ghost">Cerrar sesión</button>
       </div>
     </header>
@@ -231,6 +232,11 @@
         <div>
           <h1>Tu resumen de fatiga visual</h1>
           <p class="muted">Registra una sesión <strong>antes</strong> y otra <strong>después</strong> de tu jornada de estudio para ver cómo cambian tus indicadores.</p>
+          <p id="dash-codigo" class="participant-code" hidden>
+            <span>Tu código de participante</span>
+            <strong id="dash-codigo-valor"></strong>
+            <small class="muted">Escríbelo en el cuestionario de usabilidad (SUS) cuando te lo pidan.</small>
+          </p>
         </div>
         <button type="button" id="dash-start-btn" class="btn btn--primary btn--lg">
           <span>Nueva sesión</span>
@@ -503,6 +509,106 @@
     </dialog>
   </main>
 
+  <main id="admin-view" hidden>
+    <header class="topbar">
+      <button type="button" id="admin-back-btn" class="btn btn--ghost">
+        <svg aria-hidden="true"><use href="#i-arrow-left"/></svg>
+        <span>Panel</span>
+      </button>
+      <div class="topbar__actions">
+        <button type="button" class="btn btn--icon theme-toggle" aria-label="Cambiar tema claro u oscuro">
+          <svg class="theme-toggle__moon"><use href="#i-moon"/></svg>
+          <svg class="theme-toggle__sun"><use href="#i-sun"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="page">
+      <section class="hero card">
+        <div>
+          <h1>Administración</h1>
+          <p class="muted">Datos del estudio con códigos anónimos. Los nombres y correos no se muestran ni se exportan.</p>
+        </div>
+      </section>
+
+      <section class="card admin-card">
+        <header class="section-head">
+          <h2>Participantes</h2>
+        </header>
+        <div class="table-scroll admin-table">
+          <table>
+            <thead><tr><th>Código</th><th>Sesiones</th><th>Antes</th><th>Después</th><th>Última sesión</th></tr></thead>
+            <tbody id="admin-participantes"></tbody>
+          </table>
+        </div>
+        <p id="admin-participantes-error" class="notice notice--error" hidden></p>
+      </section>
+
+      <section class="card admin-card">
+        <header class="section-head">
+          <h2>Sesiones</h2>
+          <p class="muted">Haz clic en una sesión para ver sus métricas por minuto y el diagnóstico.</p>
+        </header>
+        <form id="admin-filtros" class="admin-filters" novalidate>
+          <label class="field">
+            <span class="field__label">Participante</span>
+            <select id="admin-filtro-participante" class="admin-input"><option value="">Todos</option></select>
+          </label>
+          <label class="field">
+            <span class="field__label">Momento</span>
+            <select id="admin-filtro-momento" class="admin-input">
+              <option value="">Todos</option>
+              <option value="pre">Antes de la jornada</option>
+              <option value="post">Después de la jornada</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field__label">Desde</span>
+            <input type="date" id="admin-filtro-desde" class="admin-input" />
+          </label>
+          <label class="field">
+            <span class="field__label">Hasta</span>
+            <input type="date" id="admin-filtro-hasta" class="admin-input" />
+          </label>
+          <div class="admin-filters__actions">
+            <button type="submit" class="btn btn--primary">Filtrar</button>
+            <button type="button" id="admin-export-sesiones" class="btn btn--ghost">Exportar sesiones CSV</button>
+            <button type="button" id="admin-export-mediciones" class="btn btn--ghost">Exportar mediciones CSV</button>
+          </div>
+        </form>
+        <p id="admin-sesiones-error" class="notice notice--error" role="alert" hidden></p>
+        <div class="table-scroll admin-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Sesión</th><th>Participante</th><th>Fecha</th><th>Actividad</th><th>Momento</th><th>KSS</th>
+                <th>Duración</th><th>Mediciones</th><th>Nivel tramo final</th><th>Somnolencia</th><th>Diagnóstico</th>
+              </tr>
+            </thead>
+            <tbody id="admin-sesiones"></tbody>
+          </table>
+        </div>
+        <div id="admin-sesiones-empty" class="empty" hidden>
+          <svg aria-hidden="true"><use href="#i-eye"/></svg>
+          <p>No hay sesiones con estos filtros.</p>
+        </div>
+      </section>
+
+      <section id="admin-detalle" class="card admin-card" hidden>
+        <header class="section-head admin-detail__head">
+          <div>
+            <h2 id="admin-detalle-titulo"></h2>
+            <p id="admin-detalle-meta" class="muted"></p>
+          </div>
+          <button type="button" id="admin-detalle-cerrar" class="btn btn--icon btn--sm" aria-label="Cerrar detalle"><svg><use href="#i-x"/></svg></button>
+        </header>
+        <div id="admin-detalle-graficas" class="session-summary__body"></div>
+        <h3 class="admin-detail__subtitle">Diagnóstico</h3>
+        <div id="admin-detalle-diagnostico" class="analysis"></div>
+      </section>
+    </div>
+  </main>
+
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 
@@ -514,6 +620,7 @@
   <script src="/static/js/monitoreo.js"></script>
   <script src="/static/js/blink-game.js"></script>
   <script src="/static/js/dashboard.js"></script>
+  <script src="/static/js/admin.js"></script>
   <script src="/static/js/auth.js"></script>
 </body>
 </html>

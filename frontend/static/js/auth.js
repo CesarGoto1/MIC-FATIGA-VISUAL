@@ -83,6 +83,7 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
         body: JSON.stringify({ email, password }),
       });
       setSession(data.access_token, data.usuario_id, data.nombre);
+      setPerfil(data);
       showDashboardView();
     } catch (err) {
       showError(err.message);
@@ -104,6 +105,7 @@ document.getElementById("register-form").addEventListener("submit", async (e) =>
         body: JSON.stringify({ nombre, email, password }),
       });
       setSession(data.access_token, data.usuario_id, data.nombre);
+      setPerfil(data);
       showDashboardView();
     } catch (err) {
       showError(err.message);

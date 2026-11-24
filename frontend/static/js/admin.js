@@ -1,194 +1,277 @@
-const ESTADO_ANALISIS_LABEL = {
+import { liberarGrabacion, mostrarGrabacion } from "./admin-grabacion.js";
+import { pintarDiagnostico } from "./analisis.js";
+import { descargar, solicitar, solicitarTodo } from "./api.js";
+import {
+  ACTIVIDAD_ETIQUETA,
+  MOMENTO_ETIQUETA,
+  NIVEL_CLASE,
+  NIVEL_ETIQUETA,
+  alActivar,
+  escaparHtml,
+  fecha,
+  htmlCargando,
+} from "./formato.js";
+import { pintarGraficasSesion } from "./graficas.js";
+import { alMostrarVista, mostrarAdmin, mostrarPanel } from "./vistas.js";
+
+const ETIQUETA_ESTADO_ANALISIS = {
   disponible: "Disponible",
   pendiente: "Pendiente",
   no_disponible: "No disponible",
   sin_datos: "Sin datos",
 };
+const FILTROS = ["participante", "momento", "desde", "hasta"];
+const SESIONES_POR_PAGINA = 20;
 
-const adminFiltros = document.getElementById("admin-filtros");
-const adminDetalle = document.getElementById("admin-detalle");
-let liberarGraficasAdmin = null;
+const formularioFiltros = document.getElementById("admin-filtros");
+const detalle = document.getElementById("admin-detalle");
+const graficasDetalle = document.getElementById("admin-detalle-graficas");
+const diagnosticoDetalle = document.getElementById("admin-detalle-diagnostico");
+const tituloDetalle = document.getElementById("admin-detalle-titulo");
+const metaDetalle = document.getElementById("admin-detalle-meta");
+const selectorParticipante = document.getElementById("admin-filtro-participante");
+const paginador = document.getElementById("admin-sesiones-paginacion");
+const textoPagina = document.getElementById("admin-sesiones-pagina");
+const botonAnterior = document.getElementById("admin-sesiones-anterior");
+const botonSiguiente = document.getElementById("admin-sesiones-siguiente");
 
-function filtrosAdmin() {
-  const params = new URLSearchParams();
-  const valores = {
-    participante: document.getElementById("admin-filtro-participante").value,
-    momento: document.getElementById("admin-filtro-momento").value,
-    desde: document.getElementById("admin-filtro-desde").value,
-    hasta: document.getElementById("admin-filtro-hasta").value,
-  };
-  Object.entries(valores).forEach(([clave, valor]) => {
-    if (valor) params.set(clave, valor);
+let liberarGraficas = null;
+let paginaSesiones = 1;
+
+function consultaFiltros(extra = {}) {
+  const parametros = new URLSearchParams(extra);
+  FILTROS.forEach((filtro) => {
+    const valor = document.getElementById(`admin-filtro-${filtro}`).value;
+    if (valor) parametros.set(filtro, valor);
   });
-  const query = params.toString();
-  return query ? `?${query}` : "";
+  const consulta = parametros.toString();
+  return consulta ? `?${consulta}` : "";
 }
 
-function mostrarErrorAdmin(id, mensaje) {
-  const el = document.getElementById(id);
-  el.textContent = mensaje;
-  el.hidden = !mensaje;
+function mostrarError(id, mensaje) {
+  const elemento = document.getElementById(id);
+  elemento.textContent = mensaje;
+  elemento.hidden = !mensaje;
 }
 
-function formatFecha(iso) {
-  return iso ? dateFormatter.format(new Date(iso)) : "–";
+const textoInterruptor = (activo) => (activo ? "Activada" : "Desactivada");
+
+function filaParticipante(p) {
+  const codigo = escaparHtml(p.codigo);
+  return `<tr><td><strong>${codigo}</strong></td><td>${p.sesiones}</td><td>${p.sesiones_pre}</td>
+    <td>${p.sesiones_post}</td><td>${fecha(p.ultima_sesion)}</td>
+    <td><label class="interruptor-admin"><input type="checkbox" data-codigo="${codigo}" ${p.grabacion_habilitada ? "checked" : ""} />
+    <span>${textoInterruptor(p.grabacion_habilitada)}</span></label></td></tr>`;
 }
 
 async function cargarParticipantes() {
-  const tbody = document.getElementById("admin-participantes");
-  const select = document.getElementById("admin-filtro-participante");
-  mostrarErrorAdmin("admin-participantes-error", "");
+  const tabla = document.getElementById("admin-participantes");
+  mostrarError("admin-participantes-error", "");
   try {
-    const participantes = await apiFetch("/admin/participantes");
-    tbody.innerHTML = participantes
-      .map(
-        (p) => `<tr><td><strong>${escapeHtml(p.codigo)}</strong></td><td>${p.sesiones}</td><td>${p.sesiones_pre}</td>
-          <td>${p.sesiones_post}</td><td>${formatFecha(p.ultima_sesion)}</td></tr>`
-      )
-      .join("");
-    const actual = select.value;
-    select.innerHTML =
+    const participantes = await solicitarTodo("/admin/participantes");
+    tabla.innerHTML = participantes.map(filaParticipante).join("");
+    tabla.querySelectorAll("input[data-codigo]").forEach((casilla) => casilla.addEventListener("change", cambiarGrabacion));
+    const elegido = selectorParticipante.value;
+    selectorParticipante.innerHTML =
       `<option value="">Todos</option>` +
-      participantes.map((p) => `<option value="${escapeHtml(p.codigo)}">${escapeHtml(p.codigo)}</option>`).join("");
-    select.value = actual;
+      participantes.map((p) => `<option value="${escaparHtml(p.codigo)}">${escaparHtml(p.codigo)}</option>`).join("");
+    selectorParticipante.value = elegido;
   } catch (err) {
-    tbody.innerHTML = "";
-    mostrarErrorAdmin("admin-participantes-error", `No se pudo cargar la lista de participantes: ${err.message}`);
+    tabla.innerHTML = "";
+    mostrarError("admin-participantes-error", `No se pudo cargar la lista de participantes: ${err.message}`);
   }
 }
 
-function renderFilaSesion(sesion) {
-  const row = document.createElement("tr");
-  row.className = "admin-row";
-  row.tabIndex = 0;
+async function cambiarGrabacion(e) {
+  const casilla = e.currentTarget;
+  casilla.disabled = true;
+  mostrarError("admin-participantes-error", "");
+  try {
+    const participante = await solicitar(`/admin/participantes/${casilla.dataset.codigo}`, {
+      method: "PATCH",
+      body: JSON.stringify({ grabacion_habilitada: casilla.checked }),
+    });
+    casilla.checked = participante.grabacion_habilitada;
+  } catch (err) {
+    casilla.checked = !casilla.checked;
+    mostrarError("admin-participantes-error", `No se pudo cambiar la grabación: ${err.message}`);
+  } finally {
+    casilla.nextElementSibling.textContent = textoInterruptor(casilla.checked);
+    casilla.disabled = false;
+  }
+}
+
+function textoKss({ kss_inicial: inicial, kss_final: final }) {
+  if (inicial === null) return "–";
+  return final !== null ? `${inicial} → ${final}` : `${inicial}`;
+}
+
+function textoSomnolencia(sesion) {
+  if (sesion.somnolencia_tramo_final === null) return "–";
+  return `${sesion.somnolencia_tramo_final ? "Sí" : "No"} (${sesion.mediciones_con_somnolencia} min)`;
+}
+
+function textoGrabacion(sesion) {
+  if (sesion.tiene_grabacion) return "Sí";
+  return sesion.grabacion_consentida === false ? "Rechazada" : "–";
+}
+
+function filaSesion(sesion) {
+  const fila = document.createElement("tr");
+  fila.className = "fila-admin";
+  fila.tabIndex = 0;
   const nivel = sesion.nivel_fatiga_tramo_final;
-  const kss = sesion.kss_inicial !== null ? `${sesion.kss_inicial}${sesion.kss_final !== null ? ` → ${sesion.kss_final}` : ""}` : "–";
-  const somnolencia = sesion.somnolencia_tramo_final === null
-    ? "–"
-    : `${sesion.somnolencia_tramo_final ? "Sí" : "No"} (${sesion.mediciones_con_somnolencia} min)`;
-  row.innerHTML = `
+  const momento = sesion.momento
+    ? `<span class="distintivo distintivo--${sesion.momento}">${MOMENTO_ETIQUETA[sesion.momento]}</span>`
+    : "–";
+  fila.innerHTML = `
     <td>#${sesion.id}</td>
-    <td><strong>${escapeHtml(sesion.participante)}</strong></td>
-    <td>${formatFecha(sesion.iniciada_en)}</td>
-    <td>${escapeHtml(ACTIVIDAD_LABEL[sesion.actividad] || sesion.actividad)}</td>
-    <td>${sesion.momento ? `<span class="chip chip--${sesion.momento}">${MOMENTO_LABEL[sesion.momento]}</span>` : "–"}</td>
-    <td>${kss}</td>
+    <td><strong>${escaparHtml(sesion.participante)}</strong></td>
+    <td>${fecha(sesion.iniciada_en)}</td>
+    <td>${escaparHtml(ACTIVIDAD_ETIQUETA[sesion.actividad] || sesion.actividad)}</td>
+    <td>${momento}</td>
+    <td>${textoKss(sesion)}</td>
     <td>${sesion.duracion_min !== null ? `${sesion.duracion_min} min` : "Sin finalizar"}</td>
     <td>${sesion.num_mediciones}</td>
-    <td>${nivel ? `<span class="badge ${NIVEL_CLASE[nivel]}">${NIVEL_LABEL[nivel]}</span>` : "–"}</td>
-    <td>${somnolencia}</td>
-    <td>${ESTADO_ANALISIS_LABEL[sesion.estado_analisis]}</td>`;
-  const abrir = () => abrirDetalleSesion(sesion.id);
-  row.addEventListener("click", abrir);
-  row.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      abrir();
+    <td>${sesion.parpadeos_completos}</td>
+    <td>${sesion.parpadeos_incompletos}</td>
+    <td>${textoGrabacion(sesion)}</td>
+    <td>${nivel ? `<span class="insignia ${NIVEL_CLASE[nivel]}">${NIVEL_ETIQUETA[nivel]}</span>` : "–"}</td>
+    <td>${textoSomnolencia(sesion)}</td>
+    <td>${ETIQUETA_ESTADO_ANALISIS[sesion.estado_analisis]}</td>`;
+  alActivar(fila, () => abrirDetalle(sesion.id));
+  return fila;
+}
+
+function pintarPaginador({ pagina, paginas, total }) {
+  paginador.hidden = paginas <= 1;
+  textoPagina.textContent = `Página ${pagina} de ${paginas} · ${total} sesiones`;
+  botonAnterior.disabled = pagina <= 1;
+  botonSiguiente.disabled = pagina >= paginas;
+}
+
+async function cargarSesiones(pagina = paginaSesiones) {
+  const tabla = document.getElementById("admin-sesiones");
+  const vacio = document.getElementById("admin-sesiones-vacio");
+  mostrarError("admin-sesiones-error", "");
+  vacio.hidden = true;
+  paginador.hidden = true;
+  tabla.replaceChildren();
+  try {
+    const respuesta = await solicitar(
+      `/admin/sesiones${consultaFiltros({ pagina, por_pagina: SESIONES_POR_PAGINA })}`
+    );
+    if (respuesta.elementos.length === 0 && pagina > 1) {
+      cargarSesiones(Math.max(respuesta.paginas, 1));
+      return;
     }
-  });
-  return row;
-}
-
-async function cargarSesionesAdmin() {
-  const tbody = document.getElementById("admin-sesiones");
-  const empty = document.getElementById("admin-sesiones-empty");
-  mostrarErrorAdmin("admin-sesiones-error", "");
-  empty.hidden = true;
-  tbody.innerHTML = "";
-  try {
-    const sesiones = await apiFetch(`/admin/sesiones${filtrosAdmin()}`);
-    sesiones.forEach((s) => tbody.append(renderFilaSesion(s)));
-    empty.hidden = sesiones.length > 0;
+    paginaSesiones = respuesta.pagina;
+    tabla.replaceChildren(...respuesta.elementos.map(filaSesion));
+    vacio.hidden = respuesta.total > 0;
+    pintarPaginador(respuesta);
   } catch (err) {
-    mostrarErrorAdmin("admin-sesiones-error", `No se pudieron cargar las sesiones: ${err.message}`);
+    mostrarError("admin-sesiones-error", `No se pudieron cargar las sesiones: ${err.message}`);
   }
 }
 
-function cerrarDetalleSesion() {
-  liberarGraficasAdmin?.();
-  liberarGraficasAdmin = null;
-  document.getElementById("admin-detalle-graficas").innerHTML = "";
-  adminDetalle.hidden = true;
+function cerrarDetalle() {
+  liberarGraficas?.();
+  liberarGraficas = null;
+  graficasDetalle.replaceChildren();
+  liberarGrabacion();
+  detalle.hidden = true;
+  detalle.dataset.sesionId = "";
 }
 
-async function abrirDetalleSesion(sesionId) {
-  cerrarDetalleSesion();
-  const graficas = document.getElementById("admin-detalle-graficas");
-  const diagnostico = document.getElementById("admin-detalle-diagnostico");
-  adminDetalle.hidden = false;
-  document.getElementById("admin-detalle-titulo").textContent = `Sesión #${sesionId}`;
-  document.getElementById("admin-detalle-meta").textContent = "";
-  graficas.innerHTML = `<p class="analysis-status__text"><span class="spinner" aria-hidden="true"></span>Cargando sesión…</p>`;
-  diagnostico.innerHTML = "";
-  adminDetalle.scrollIntoView({ behavior: "smooth", block: "start" });
-
-  let sesion;
-  try {
-    sesion = await apiFetch(`/admin/sesiones/${sesionId}`);
-  } catch (err) {
-    graficas.innerHTML = `<p class="notice notice--error">No se pudo cargar la sesión: ${escapeHtml(err.message)}</p>`;
-    return;
-  }
-
-  document.getElementById("admin-detalle-titulo").textContent = `Sesión #${sesion.id} · ${sesion.participante}`;
-  document.getElementById("admin-detalle-meta").textContent = [
-    formatFecha(sesion.iniciada_en),
-    ACTIVIDAD_LABEL[sesion.actividad] || sesion.actividad,
-    sesion.momento ? MOMENTO_LABEL[sesion.momento] : null,
+function textoMeta(sesion) {
+  return [
+    fecha(sesion.iniciada_en),
+    ACTIVIDAD_ETIQUETA[sesion.actividad] || sesion.actividad,
+    sesion.momento ? MOMENTO_ETIQUETA[sesion.momento] : null,
     `${sesion.num_mediciones} mediciones`,
+    `${sesion.parpadeos_completos} parpadeos completos`,
+    `${sesion.parpadeos_incompletos} incompletos`,
+    `${sesion.cierres_prolongados_total} cierres prolongados`,
   ]
     .filter(Boolean)
     .join(" · ");
-
-  if (sesion.mediciones.length > 0) {
-    liberarGraficasAdmin = Charts.renderSession(graficas, sesion);
-  } else {
-    graficas.innerHTML = `<p class="muted">Esta sesión no tiene mediciones.</p>`;
-  }
-
-  const diag = sesion.diagnostico;
-  if (diag.disponible && diag.detalle) {
-    diagnostico.innerHTML = renderAnalisis(diag.detalle);
-  } else if (diag.disponible && diag.texto) {
-    diagnostico.textContent = diag.texto;
-  } else {
-    diagnostico.innerHTML = `<p class="muted">Diagnóstico: ${ESTADO_ANALISIS_LABEL[sesion.estado_analisis].toLowerCase()}.</p>`;
-  }
 }
 
-async function exportarCsv(boton, ruta, nombre) {
-  boton.disabled = true;
-  mostrarErrorAdmin("admin-sesiones-error", "");
+async function abrirDetalle(sesionId) {
+  cerrarDetalle();
+  detalle.hidden = false;
+  detalle.dataset.sesionId = sesionId;
+  tituloDetalle.textContent = `Sesión #${sesionId}`;
+  metaDetalle.textContent = "";
+  graficasDetalle.innerHTML = htmlCargando("Cargando sesión…", "p");
+  diagnosticoDetalle.replaceChildren();
+  detalle.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  let sesion;
   try {
-    await apiDownload(`${ruta}${filtrosAdmin()}`, nombre);
+    sesion = await solicitar(`/admin/sesiones/${sesionId}`);
   } catch (err) {
-    mostrarErrorAdmin("admin-sesiones-error", `No se pudo exportar: ${err.message}`);
+    graficasDetalle.innerHTML = `<p class="aviso aviso--error">No se pudo cargar la sesión: ${escaparHtml(err.message)}</p>`;
+    return;
+  }
+
+  tituloDetalle.textContent = `Sesión #${sesion.id} · ${sesion.participante}`;
+  metaDetalle.textContent = textoMeta(sesion);
+  if (sesion.mediciones.length > 0) {
+    liberarGraficas = pintarGraficasSesion(graficasDetalle, sesion);
+  } else {
+    graficasDetalle.innerHTML = `<p class="tenue">Esta sesión no tiene mediciones.</p>`;
+  }
+  if (sesion.grabacion) mostrarGrabacion(sesion, { alEliminar: () => cargarSesiones() });
+  pintarDiagnostico(
+    diagnosticoDetalle,
+    sesion.diagnostico,
+    `Diagnóstico: ${ETIQUETA_ESTADO_ANALISIS[sesion.estado_analisis].toLowerCase()}.`
+  );
+}
+
+async function exportarCsv(boton, ruta, nombreArchivo) {
+  boton.disabled = true;
+  mostrarError("admin-sesiones-error", "");
+  try {
+    await descargar(ruta, nombreArchivo);
+  } catch (err) {
+    mostrarError("admin-sesiones-error", `No se pudo exportar: ${err.message}`);
   } finally {
     boton.disabled = false;
   }
 }
 
-function refreshAdmin() {
-  cerrarDetalleSesion();
+function actualizarAdmin() {
+  cerrarDetalle();
   cargarParticipantes();
-  cargarSesionesAdmin();
+  cargarSesiones(1);
 }
 
-adminFiltros.addEventListener("submit", (e) => {
+formularioFiltros.addEventListener("submit", (e) => {
   e.preventDefault();
-  cerrarDetalleSesion();
-  cargarSesionesAdmin();
+  cerrarDetalle();
+  cargarSesiones(1);
 });
 
-document.getElementById("admin-export-sesiones").addEventListener("click", (e) =>
-  exportarCsv(e.currentTarget, "/admin/export/sesiones.csv", "sesiones.csv")
-);
-document.getElementById("admin-export-mediciones").addEventListener("click", (e) =>
-  exportarCsv(e.currentTarget, "/admin/export/mediciones.csv", "mediciones.csv")
-);
-document.getElementById("admin-detalle-cerrar").addEventListener("click", cerrarDetalleSesion);
-document.getElementById("admin-back-btn").addEventListener("click", () => {
-  cerrarDetalleSesion();
-  showDashboardView();
+botonAnterior.addEventListener("click", () => cargarSesiones(paginaSesiones - 1));
+botonSiguiente.addEventListener("click", () => cargarSesiones(paginaSesiones + 1));
+
+["sesiones", "mediciones", "parpadeos"].forEach((tabla) => {
+  document.getElementById(`admin-exportar-${tabla}`).addEventListener("click", (e) =>
+    exportarCsv(e.currentTarget, `/admin/exportaciones/${tabla}.csv${consultaFiltros()}`, `${tabla}.csv`)
+  );
 });
-document.getElementById("dash-admin-btn").addEventListener("click", showAdminView);
+
+document.getElementById("admin-detalle-exportar-parpadeos").addEventListener("click", (e) => {
+  const id = detalle.dataset.sesionId;
+  if (id) exportarCsv(e.currentTarget, `/admin/exportaciones/parpadeos.csv?sesion_id=${id}`, `parpadeos_sesion_${id}.csv`);
+});
+document.getElementById("admin-detalle-cerrar").addEventListener("click", cerrarDetalle);
+document.getElementById("admin-boton-volver").addEventListener("click", () => {
+  cerrarDetalle();
+  mostrarPanel();
+});
+document.getElementById("panel-boton-admin").addEventListener("click", mostrarAdmin);
+
+alMostrarVista("admin", actualizarAdmin);

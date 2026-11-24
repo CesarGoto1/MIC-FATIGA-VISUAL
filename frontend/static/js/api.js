@@ -1,69 +1,91 @@
-const API_BASE = "";
+const PREFIJO_API = "/api/v1";
+const POR_PAGINA_MAXIMO = 100;
+const CLAVES_SESION = ["token_acceso", "usuario_nombre", "codigo_participante", "es_admin"];
 
-function getToken() {
-  return localStorage.getItem("access_token");
+export function obtenerToken() {
+  return localStorage.getItem("token_acceso");
 }
 
-function setSession(token, usuarioId, nombre) {
-  localStorage.setItem("access_token", token);
-  localStorage.setItem("usuario_nombre", nombre);
+export function guardarToken(token) {
+  localStorage.setItem("token_acceso", token);
 }
 
-function setPerfil({ nombre, codigo_participante, es_admin }) {
+export function guardarPerfil({ nombre, codigo_participante, es_admin }) {
   localStorage.setItem("usuario_nombre", nombre);
   localStorage.setItem("codigo_participante", codigo_participante);
   localStorage.setItem("es_admin", String(es_admin));
 }
 
-function esAdmin() {
+export function esAdmin() {
   return localStorage.getItem("es_admin") === "true";
 }
 
-function clearSession() {
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("usuario_nombre");
-  localStorage.removeItem("codigo_participante");
-  localStorage.removeItem("es_admin");
+export function borrarSesion() {
+  CLAVES_SESION.forEach((clave) => localStorage.removeItem(clave));
 }
 
-async function apiDownload(path, filename) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: { Authorization: `Bearer ${getToken()}` },
+function cabeceraAutorizacion() {
+  const token = obtenerToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function errorDeRespuesta(respuesta) {
+  const cuerpo = await respuesta.json().catch(() => ({}));
+  const error = new Error(cuerpo.error?.mensaje || `Error ${respuesta.status}`);
+  error.estado = respuesta.status;
+  error.codigo = cuerpo.error?.codigo;
+  error.detalles = cuerpo.error?.detalles || [];
+  return error;
+}
+
+export async function solicitar(ruta, opciones = {}) {
+  const tieneToken = Boolean(obtenerToken());
+  const respuesta = await fetch(`${PREFIJO_API}${ruta}`, {
+    ...opciones,
+    headers: { "Content-Type": "application/json", ...cabeceraAutorizacion(), ...opciones.headers },
   });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || `Error ${response.status}`);
-  }
-  const url = URL.createObjectURL(await response.blob());
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
 
-async function apiFetch(path, options = {}) {
-  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
-  const token = getToken();
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
-  const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
-
-  if (response.status === 401 && token) {
-    clearSession();
+  if (respuesta.status === 401 && tieneToken) {
+    borrarSesion();
     location.reload();
     throw new Error("Sesión expirada.");
   }
+  if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
+  return respuesta.status === 204 ? null : respuesta.json();
+}
 
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    const error = new Error(body.detail || `Error ${response.status}`);
-    error.status = response.status;
-    throw error;
+export async function solicitarTodo(ruta) {
+  const separador = ruta.includes("?") ? "&" : "?";
+  const elementos = [];
+  for (let pagina = 1; ; pagina += 1) {
+    const respuesta = await solicitar(`${ruta}${separador}pagina=${pagina}&por_pagina=${POR_PAGINA_MAXIMO}`);
+    elementos.push(...respuesta.elementos);
+    if (pagina >= respuesta.paginas) return elementos;
   }
+}
 
-  if (response.status === 204) return null;
-  return response.json();
+export async function solicitarArchivo(ruta) {
+  const respuesta = await fetch(`${PREFIJO_API}${ruta}`, { headers: cabeceraAutorizacion() });
+  if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
+  return respuesta.blob();
+}
+
+export async function subirBinario(ruta, contenido) {
+  const respuesta = await fetch(`${PREFIJO_API}${ruta}`, {
+    method: "PUT",
+    headers: { ...cabeceraAutorizacion(), "Content-Type": "application/octet-stream" },
+    body: contenido,
+  });
+  if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
+}
+
+export async function descargar(ruta, nombreArchivo) {
+  const url = URL.createObjectURL(await solicitarArchivo(ruta));
+  const enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = nombreArchivo;
+  document.body.append(enlace);
+  enlace.click();
+  enlace.remove();
+  URL.revokeObjectURL(url);
 }

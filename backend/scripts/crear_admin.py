@@ -1,32 +1,31 @@
 import argparse
 import sys
 
-from backend.database import SessionLocal
-from backend.models.orm import Usuario
+from sqlalchemy import func, select
+
+from backend.base_datos import crear_sesion_bd
+from backend.modelos.orm import Usuario
 
 
-def promover(email: str) -> bool:
-    db = SessionLocal()
-    try:
-        usuario = db.query(Usuario).filter(Usuario.email == email).first()
+def promover(correo: str) -> bool:
+    with crear_sesion_bd() as bd:
+        usuario = bd.scalar(select(Usuario).where(func.lower(Usuario.correo) == correo.strip().lower()))
         if usuario is None:
             return False
         usuario.es_admin = True
-        db.commit()
+        bd.commit()
         return True
-    finally:
-        db.close()
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Promueve un usuario existente a administrador.")
-    parser.add_argument("email", help="Correo de la cuenta ya registrada")
-    args = parser.parse_args()
+    analizador = argparse.ArgumentParser(description="Promueve un usuario existente a administrador.")
+    analizador.add_argument("correo", help="Correo de la cuenta ya registrada")
+    argumentos = analizador.parse_args()
 
-    if not promover(args.email):
-        print(f"No existe ninguna cuenta con el correo {args.email}.", file=sys.stderr)
+    if not promover(argumentos.correo):
+        print(f"No existe ninguna cuenta con el correo {argumentos.correo}.", file=sys.stderr)
         sys.exit(1)
-    print(f"La cuenta {args.email} ahora es administradora.")
+    print(f"La cuenta {argumentos.correo} ahora es administradora.")
 
 
 if __name__ == "__main__":
